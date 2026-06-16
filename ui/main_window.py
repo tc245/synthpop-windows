@@ -1,6 +1,8 @@
 from PySide6.QtCore import Slot
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
-    QHBoxLayout, QLabel, QMainWindow, QTabWidget, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+    QTabWidget, QVBoxLayout, QWidget,
 )
 
 from ui.data_tab import DataTab
@@ -21,6 +23,43 @@ class MainWindow(QMainWindow):
         self.synth_df = None
 
         self._build_ui()
+        self._build_menu()
+
+    # ── Menu bar ──────────────────────────────────────────────────────────────
+
+    def _build_menu(self):
+        help_menu = self.menuBar().addMenu("Help")
+
+        guide = QAction("User Guide", self)
+        guide.setShortcut("F1")
+        guide.triggered.connect(self._show_help)
+        help_menu.addAction(guide)
+
+        help_menu.addSeparator()
+
+        about = QAction("About", self)
+        about.triggered.connect(self._show_about)
+        help_menu.addAction(about)
+
+    def _show_help(self):
+        from ui.help_dialog import HelpDialog
+        dlg = HelpDialog(self)
+        dlg.exec()
+
+    def _show_about(self):
+        QMessageBox.about(
+            self,
+            "About SLS Synthetic Data Generator",
+            "<h3>SLS Synthetic Data Generator</h3>"
+            "<p><b>Version 1.0.0</b></p>"
+            "<p>A standalone tool for generating privacy-preserving synthetic "
+            "datasets from CSV files, developed for the Scottish Longitudinal "
+            "Study Development &amp; Support Unit (SLS-DSU).</p>"
+            "<p>Synthesis is powered by <b>python-synthpop</b>, a Python port "
+            "of the R synthpop package.</p>"
+            "<p style='color:#777;'>© SLS-DSU &nbsp;·&nbsp; "
+            "sls.lscs.ac.uk</p>",
+        )
 
     # ── Header banner ─────────────────────────────────────────────────────────
 

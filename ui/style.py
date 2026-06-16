@@ -298,12 +298,47 @@ QRadioButton::indicator:hover {{
     border-color: {PURPLE};
 }}
 
+/* ── Menu bar ────────────────────────────────────────── */
+QMenuBar {{
+    background: {PURPLE_DARK};
+    color: white;
+    padding: 2px 4px;
+    font-size: 12px;
+}}
+QMenuBar::item {{
+    padding: 4px 10px;
+    background: transparent;
+    border-radius: 3px;
+}}
+QMenuBar::item:selected {{
+    background: {PURPLE};
+}}
+QMenu {{
+    background: white;
+    border: 1px solid {BORDER};
+    padding: 4px 0;
+}}
+QMenu::item {{
+    padding: 5px 24px 5px 16px;
+    color: {TEXT};
+}}
+QMenu::item:selected {{
+    background: {PURPLE};
+    color: white;
+}}
+QMenu::separator {{
+    height: 1px;
+    background: {BORDER};
+    margin: 4px 8px;
+}}
+
 /* ── Tooltips ────────────────────────────────────────── */
 QToolTip {{
     background: {PURPLE_DARK};
     color: white;
     border: none;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 3px;
+    font-size: 11px;
 }}
 """

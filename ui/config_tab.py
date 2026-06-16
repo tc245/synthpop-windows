@@ -216,6 +216,114 @@ class ConfigTab(QWidget):
         btn_row.addWidget(self._cancel_btn)
         root.addLayout(btn_row)
 
+        # ── Tooltips ─────────────────────────────────────────────────────────
+        self._n_rows.setToolTip(
+            "<p><b>Output rows</b></p>"
+            "<p>Number of rows in the synthetic dataset. Defaults to the "
+            "same number as the original data. You can request more or fewer "
+            "rows than the original — the model is trained once and sampled "
+            "as many times as needed.</p>"
+        )
+        self._cart_radio.setToolTip(
+            "<p><b>CART (Classification and Regression Trees)</b></p>"
+            "<p>Synthesises each column sequentially using a decision tree "
+            "fitted on all previously synthesised columns. Handles mixed "
+            "numeric and categorical data naturally and preserves complex "
+            "non-linear relationships. Recommended default.</p>"
+        )
+        self._gc_radio.setToolTip(
+            "<p><b>Gaussian Copula</b></p>"
+            "<p>Models the joint distribution of numeric variables using a "
+            "multivariate Gaussian copula, then fits separate marginal "
+            "distributions per column. Faster than CART on large datasets "
+            "but assumes the dependency structure is approximately Gaussian. "
+            "Less suited to highly non-linear or mixed data.</p>"
+        )
+        self._smoothing.setToolTip(
+            "<p><b>Smoothing</b></p>"
+            "<p>Adds small random noise drawn from within each leaf node of "
+            "the CART tree, making the synthetic distribution less discretely "
+            "blocky. Useful for continuous numeric variables where you want "
+            "a smoother output distribution.</p>"
+        )
+        self._proper.setToolTip(
+            "<p><b>Proper synthesis</b></p>"
+            "<p>Re-fits the CART model on a bootstrap resample of the data "
+            "before each synthesis step, adding model uncertainty to the "
+            "synthetic values. Produces more statistically rigorous "
+            "inference-safe synthetic data at the cost of slightly lower "
+            "fidelity and longer runtime.</p>"
+        )
+        self._minibucket.setToolTip(
+            "<p><b>Minibucket</b></p>"
+            "<p>Minimum number of observations required in a leaf node "
+            "before the CART tree stops splitting. Higher values produce "
+            "simpler, smoother models that are less likely to memorise "
+            "individual records. Lower values capture finer detail but "
+            "increase disclosure risk. Default 5; increase to 10–25 for "
+            "higher privacy assurance.</p>"
+        )
+        self._random_state.setToolTip(
+            "<p><b>Random state (seed)</b></p>"
+            "<p>Seed for the random number generator. Using the same seed "
+            "with the same data and settings produces identical synthetic "
+            "data, enabling reproducibility. Change the value to get a "
+            "different synthetic sample from the same model.</p>"
+        )
+        self._enforce_min_max.setToolTip(
+            "<p><b>Enforce min/max values</b></p>"
+            "<p>Clips synthetic values to the observed minimum and maximum "
+            "of each column. Prevents the Gaussian copula from generating "
+            "impossible values such as negative ages or incomes above the "
+            "observed ceiling. Recommended.</p>"
+        )
+        self._enforce_rounding.setToolTip(
+            "<p><b>Enforce rounding</b></p>"
+            "<p>Rounds synthetic values to match the decimal precision of "
+            "the original column. For example, if all original values are "
+            "whole numbers, synthetic values will also be whole numbers. "
+            "Helps maintain data type consistency.</p>"
+        )
+        self._default_dist.setToolTip(
+            "<p><b>Default distribution</b></p>"
+            "<p>Marginal distribution fitted to each numeric column before "
+            "the copula transformation is applied:</p>"
+            "<ul>"
+            "<li><b>norm</b> — standard normal (Gaussian)</li>"
+            "<li><b>beta</b> — bounded distribution rescaled to 0–1 "
+            "(recommended default)</li>"
+            "<li><b>truncnorm</b> — normal distribution clipped at the "
+            "observed min/max</li>"
+            "<li><b>uniform</b> — flat distribution between min and max</li>"
+            "</ul>"
+        )
+        self._skip_imputation.setToolTip(
+            "<p><b>Skip missing-data imputation</b></p>"
+            "<p>When checked (recommended), missing values (NaN) are left "
+            "as-is and handled natively by synthpop during model fitting. "
+            "When unchecked, a separate imputation step fills in missing "
+            "values before fitting, which can sometimes improve fidelity "
+            "but adds processing time and may introduce artefacts.</p>"
+        )
+        self._max_train_rows.setToolTip(
+            "<p><b>Max training rows</b></p>"
+            "<p>Maximum number of rows used to <i>train</i> the synthesis "
+            "model. If the dataset is larger, a random subsample is drawn "
+            "for fitting. The output can still contain as many rows as "
+            "specified in <i>Output rows</i>. Reducing this value "
+            "dramatically speeds up synthesis on large datasets with "
+            "minimal quality loss. Values above 50,000 may take a very "
+            "long time.</p>"
+        )
+        self._col_list.setToolTip(
+            "<p><b>Column selection</b></p>"
+            "<p>Tick columns to include in the synthetic dataset. "
+            "Columns marked <i>ignore</i> on the Load Data tab are "
+            "excluded automatically and do not appear here. Untick "
+            "columns you want to omit even if they were classified as "
+            "categorical or numeric.</p>"
+        )
+
         # ── Signal wiring ─────────────────────────────────────────────────────
         self._cart_radio.toggled.connect(self._on_method_changed)
         self._max_train_rows.valueChanged.connect(self._on_mtr_changed)
