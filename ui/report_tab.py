@@ -1,6 +1,7 @@
 import base64
 
-from PySide6.QtCore import QByteArray, QThread, QUrl, Slot
+from PySide6.QtCore import QByteArray, QThread, Slot
+from PySide6.QtGui import QImage
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextBrowser, QFileDialog, QMessageBox, QProgressBar,
@@ -8,30 +9,9 @@ from PySide6.QtWidgets import (
 
 from ui.synthesis_worker import ReportWorker
 
-_HEATMAP_URL = "app://heatmap/corr.png"
-
-
-class _HeatmapBrowser(QTextBrowser):
-    """QTextBrowser that serves the correlation heatmap via loadResource().
-
-    Stores the raw PNG bytes on the instance so setHtml() clearing the
-    document resource cache has no effect.  The custom 'app://' scheme
-    keeps the URL short (avoiding Qt's internal URL truncation that breaks
-    data: URIs) and prevents Qt from trying to resolve it as a file path.
-    """
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._png: bytes | None = None
-
-    def set_heatmap(self, png_bytes: bytes) -> None:
-        self._png = png_bytes
-
-    def loadResource(self, rtype: int, url: QUrl):
-        if self._png is not None and url.scheme() == "app":
-            return QByteArray(self._png)
-        return QTextBrowser.loadResource(self, rtype, url)
-
+# Unique text marker; replaces the <img> tag in the display HTML so we can
+# locate the insertion point via QTextCursor.find() after setHtml().
+_HEATMAP_MARKER = "CORR_HEATMAP_IMAGE_PLACEHOLDER_xk7q"
 
 _PRIVACY_NOTICE = (
     "<b>Privacy notice:</b> The synthetic dataset preserves statistical properties "
@@ -95,7 +75,7 @@ class ReportTab(QWidget):
         root.addWidget(self._progress)
 
         # Report browser
-        self._browser = _HeatmapBrowser()
+        self._browser = QTextBrowser()
         self._browser.setOpenLinks(False)
         root.addWidget(self._browser, stretch=1)
 
@@ -146,7 +126,7 @@ class ReportTab(QWidget):
     @Slot(dict, str)
     def _on_report_ready(self, report: dict, html: str):
         self._report = report
-        self._html = html  # keep original data: URI version for Save HTML
+        self._html = html  # keep original (with data: URI) for Save HTML export
         self._progress.setVisible(False)
         self._set_status(
             "ready",
@@ -154,26 +134,43 @@ class ReportTab(QWidget):
             f"{report['n_synth']:,} synthetic rows",
         )
 
-        # Qt truncates data: URIs (which can be hundreds of KB) before passing
-        # them to loadResource(), so images never render.  Instead we register
-        # the raw PNG bytes on the _HeatmapBrowser instance under a short
-        # custom URL ("app://heatmap/corr.png") and replace the data: URI in
-        # the display HTML.  setHtml() calls document.clear() which wipes the
-        # document resource cache, but our bytes live on the browser instance
-        # and are served via the loadResource() override — no cache to clear.
+        # QTextBrowser cannot render data: URI images — Qt's URL handling
+        # truncates the base64 payload before it reaches loadResource().
+        # All URL/cache-based workarounds also fail because setHtml() calls
+        # document.clear() which wipes any pre-registered resources.
+        #
+        # Solution: replace the <img> tag with a plain-text marker, call
+        # setHtml(), then use QTextCursor.insertImage(QImage) to embed the
+        # decoded image directly into the document.  No URL lookup involved.
+        heatmap_img: QImage | None = None
         display_html = html
         b64 = report.get("corr_heatmap_b64")
         if b64:
             try:
-                self._browser.set_heatmap(base64.b64decode(b64))
-                display_html = html.replace(
-                    f"src='data:image/png;base64,{b64}'",
-                    f"src='{_HEATMAP_URL}'",
-                )
+                img = QImage()
+                img.loadFromData(QByteArray(base64.b64decode(b64)))
+                if not img.isNull():
+                    heatmap_img = img
+                    # Exact tag text produced by core/report.py
+                    img_tag = (
+                        f"<img src='data:image/png;base64,{b64}' "
+                        f"width='100%' alt='Correlation heatmap'/>"
+                    )
+                    display_html = html.replace(img_tag, _HEATMAP_MARKER)
             except Exception as exc:
-                print(f"[report] heatmap setup failed: {exc}")
+                print(f"[report] heatmap decode failed: {exc}", flush=True)
 
         self._browser.setHtml(display_html)
+
+        # Locate the marker in the rendered document and swap it for the image.
+        if heatmap_img is not None:
+            cursor = self._browser.document().find(_HEATMAP_MARKER)
+            if not cursor.isNull():
+                cursor.removeSelectedText()
+                cursor.insertImage(heatmap_img)
+            else:
+                print("[report] heatmap marker not found in document", flush=True)
+
         self._save_html_btn.setEnabled(True)
 
     @Slot(str)
