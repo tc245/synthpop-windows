@@ -32,8 +32,8 @@ def detect_numeric_sentinels(df, threshold=_SENTINEL_FREQ_THRESHOLD):
             freq = (series == v).sum() / len(series)
             is_integer = v == int(v)
             is_sentinel = is_integer and int(v) in _SENTINEL_CODES
-            suggested = is_sentinel and freq <= threshold
-            suspects.append((int(v) if is_integer else v, freq, suggested))
+            suggested = bool(is_sentinel and freq <= threshold)
+            suspects.append((int(v) if is_integer else v, float(freq), suggested))
         if suspects:
             result[col] = suspects
     return result
