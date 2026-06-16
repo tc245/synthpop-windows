@@ -1,30 +1,13 @@
 import base64
 
 from PySide6.QtCore import QByteArray, QThread, QUrl, Slot
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QImage, QTextDocument
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextBrowser, QFileDialog, QMessageBox, QProgressBar,
 )
 
 from ui.synthesis_worker import ReportWorker
-
-
-class _DataUriBrowser(QTextBrowser):
-    """QTextBrowser that renders data: URI images inline."""
-
-    def loadResource(self, resource_type, url: QUrl):
-        s = url.toString()
-        if s.startswith("data:image/") and ";base64," in s:
-            try:
-                _, encoded = s.split(";base64,", 1)
-                img = QImage()
-                img.loadFromData(QByteArray(base64.b64decode(encoded)))
-                if not img.isNull():
-                    return img
-            except Exception:
-                pass
-        return super().loadResource(resource_type, url)
 
 _PRIVACY_NOTICE = (
     "<b>Privacy notice:</b> The synthetic dataset preserves statistical properties "
@@ -88,7 +71,7 @@ class ReportTab(QWidget):
         root.addWidget(self._progress)
 
         # Report browser
-        self._browser = _DataUriBrowser()
+        self._browser = QTextBrowser()
         self._browser.setOpenLinks(False)
         root.addWidget(self._browser, stretch=1)
 
@@ -139,14 +122,35 @@ class ReportTab(QWidget):
     @Slot(dict, str)
     def _on_report_ready(self, report: dict, html: str):
         self._report = report
-        self._html = html
+        self._html = html  # keep original data: URI version for saving
         self._progress.setVisible(False)
         self._set_status(
             "ready",
             f"Report ready — {report['n_orig']:,} original rows, "
             f"{report['n_synth']:,} synthetic rows",
         )
-        self._browser.setHtml(html)
+
+        # Pre-register the heatmap image as a named document resource.
+        # Qt's URL handling truncates very long data: URIs before passing them
+        # to loadResource(), so we must register the decoded image up-front and
+        # replace the data: URI in the display HTML with the resource name.
+        display_html = html
+        b64 = report.get("corr_heatmap_b64")
+        if b64:
+            img = QImage()
+            img.loadFromData(QByteArray(base64.b64decode(b64)))
+            if not img.isNull():
+                self._browser.document().addResource(
+                    QTextDocument.ResourceType.ImageResource,
+                    QUrl("corr_heatmap.png"),
+                    img,
+                )
+                display_html = html.replace(
+                    f"src='data:image/png;base64,{b64}'",
+                    "src='corr_heatmap.png'",
+                )
+
+        self._browser.setHtml(display_html)
         self._save_html_btn.setEnabled(True)
 
     @Slot(str)
