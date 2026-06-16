@@ -49,13 +49,23 @@ def _patch_synthpop():
                     continue
                 try:
                     if dtype == "categorical" and col in self.encoders:
-                        labels = (
-                            data[col].round()
+                        clipped = (
+                            data[col]
+                            .round()
                             .clip(0, len(self.encoders[col].classes_) - 1)
-                            .astype(int)
                         )
-                        data[col] = self.encoders[col].inverse_transform(labels)
-                        data[col] = data[col].replace("__NA__", np.nan)
+                        # NaN cannot be cast to int; track null positions,
+                        # fill with 0 for decode, then restore NaN afterwards.
+                        null_mask = clipped.isna()
+                        int_codes = clipped.fillna(0).astype(int)
+                        decoded = pd.Series(
+                            self.encoders[col].inverse_transform(int_codes),
+                            index=data[col].index,
+                            dtype=object,
+                        )
+                        decoded = decoded.replace("__NA__", np.nan)
+                        decoded[null_mask] = np.nan
+                        data[col] = decoded
                     elif dtype == "numerical" and col in self.scalers:
                         data[col] = self.scalers[col].inverse_transform(data[[col]])
                     elif dtype == "boolean":
