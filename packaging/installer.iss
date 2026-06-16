@@ -28,7 +28,7 @@ AllowNoIcons=yes
 ; Output installer to dist\installer\
 OutputDir=..\dist\installer
 OutputBaseFilename=SynthPop_Desktop_Setup_{#AppVersion}
-SetupIconFile=
+SetupIconFile=..\assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -58,12 +58,14 @@ Source: "{#BuildDir}\*"; \
 [Icons]
 ; Start Menu
 Name: "{group}\{#AppName}"; \
-  Filename: "{app}\{#AppExeName}"
+  Filename: "{app}\{#AppExeName}"; \
+  IconFilename: "{app}\{#AppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#AppName}}"; \
   Filename: "{uninstallexe}"
 ; Optional desktop shortcut
 Name: "{autodesktop}\{#AppName}"; \
   Filename: "{app}\{#AppExeName}"; \
+  IconFilename: "{app}\{#AppExeName}"; \
   Tasks: desktopicon
 
 [Run]

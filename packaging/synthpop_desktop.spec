@@ -24,6 +24,7 @@ hidden = (
 datas = (
     collect_data_files("matplotlib")
     + collect_data_files("scipy")
+    + [(str(ROOT / "assets" / "icon.png"), "assets")]
 )
 
 a = Analysis(
@@ -57,7 +58,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=str(ROOT / "assets" / "icon.ico"),
 )
 
 coll = COLLECT(
