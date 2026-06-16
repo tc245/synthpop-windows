@@ -1,14 +1,37 @@
 import base64
-import os
-import tempfile
 
-from PySide6.QtCore import QThread, QUrl, Slot
+from PySide6.QtCore import QByteArray, QThread, QUrl, Slot
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextBrowser, QFileDialog, QMessageBox, QProgressBar,
 )
 
 from ui.synthesis_worker import ReportWorker
+
+_HEATMAP_URL = "app://heatmap/corr.png"
+
+
+class _HeatmapBrowser(QTextBrowser):
+    """QTextBrowser that serves the correlation heatmap via loadResource().
+
+    Stores the raw PNG bytes on the instance so setHtml() clearing the
+    document resource cache has no effect.  The custom 'app://' scheme
+    keeps the URL short (avoiding Qt's internal URL truncation that breaks
+    data: URIs) and prevents Qt from trying to resolve it as a file path.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._png: bytes | None = None
+
+    def set_heatmap(self, png_bytes: bytes) -> None:
+        self._png = png_bytes
+
+    def loadResource(self, rtype: int, url: QUrl):
+        if self._png is not None and url.scheme() == "app":
+            return QByteArray(self._png)
+        return QTextBrowser.loadResource(self, rtype, url)
+
 
 _PRIVACY_NOTICE = (
     "<b>Privacy notice:</b> The synthetic dataset preserves statistical properties "
@@ -27,20 +50,7 @@ class ReportTab(QWidget):
         self._synth_df = None
         self._worker = None
         self._thread = None
-        self._heatmap_tmp: str | None = None
         self._build_ui()
-
-    def _drop_heatmap_tmp(self):
-        if self._heatmap_tmp:
-            try:
-                os.unlink(self._heatmap_tmp)
-            except OSError:
-                pass
-            self._heatmap_tmp = None
-
-    def closeEvent(self, event):
-        self._drop_heatmap_tmp()
-        super().closeEvent(event)
 
     def _build_ui(self):
         root = QVBoxLayout(self)
@@ -85,7 +95,7 @@ class ReportTab(QWidget):
         root.addWidget(self._progress)
 
         # Report browser
-        self._browser = QTextBrowser()
+        self._browser = _HeatmapBrowser()
         self._browser.setOpenLinks(False)
         root.addWidget(self._browser, stretch=1)
 
@@ -108,7 +118,6 @@ class ReportTab(QWidget):
 
     def set_data(self, orig_df, synth_df, variable_types):
         """Store synth_df and start async report generation."""
-        self._drop_heatmap_tmp()
         self._synth_df = synth_df
         self._report = None
         self._html = None
@@ -145,26 +154,24 @@ class ReportTab(QWidget):
             f"{report['n_synth']:,} synthetic rows",
         )
 
-        # QTextBrowser cannot render data: URI images (Qt truncates the URL
-        # before passing it to loadResource).  Write the PNG to a temp file
-        # and use a file:// URL instead — QTextBrowser handles those natively.
-        self._drop_heatmap_tmp()
+        # Qt truncates data: URIs (which can be hundreds of KB) before passing
+        # them to loadResource(), so images never render.  Instead we register
+        # the raw PNG bytes on the _HeatmapBrowser instance under a short
+        # custom URL ("app://heatmap/corr.png") and replace the data: URI in
+        # the display HTML.  setHtml() calls document.clear() which wipes the
+        # document resource cache, but our bytes live on the browser instance
+        # and are served via the loadResource() override — no cache to clear.
         display_html = html
         b64 = report.get("corr_heatmap_b64")
         if b64:
             try:
-                with tempfile.NamedTemporaryFile(
-                    suffix=".png", delete=False
-                ) as fh:
-                    fh.write(base64.b64decode(b64))
-                    self._heatmap_tmp = fh.name
-                file_url = QUrl.fromLocalFile(self._heatmap_tmp).toString()
+                self._browser.set_heatmap(base64.b64decode(b64))
                 display_html = html.replace(
                     f"src='data:image/png;base64,{b64}'",
-                    f"src='{file_url}'",
+                    f"src='{_HEATMAP_URL}'",
                 )
-            except Exception:
-                pass  # fall back to HTML without image
+            except Exception as exc:
+                print(f"[report] heatmap setup failed: {exc}")
 
         self._browser.setHtml(display_html)
         self._save_html_btn.setEnabled(True)
