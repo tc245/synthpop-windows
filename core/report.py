@@ -17,6 +17,28 @@ def _safe_float(v, ndigits=4):
         return None
 
 
+def _norm_cat(val) -> str:
+    """Normalise a categorical label to a consistent string.
+
+    Synthesis methods often convert integer category codes to floats
+    (0 → 0.0, 1 → 1.0).  Without normalisation those would appear as
+    separate labels when compared with the original string-cast values,
+    breaking both the frequency table and the chi-square test.
+    """
+    try:
+        f = float(val)
+        if not (math.isnan(f) or math.isinf(f)) and f == int(f):
+            return str(int(f))
+    except (TypeError, ValueError, OverflowError):
+        pass
+    return str(val)
+
+
+def _norm_series(series):
+    """Apply _norm_cat element-wise to a pandas Series."""
+    return series.map(_norm_cat)
+
+
 def build_synth_report(orig_df, synth_df, variable_types):
     """Compute numeric/categorical comparisons, KS tests, chi² tests, and correlation heatmap.
 
@@ -69,8 +91,8 @@ def build_synth_report(orig_df, synth_df, variable_types):
         report["numeric_summary"] = {"rows": rows, "num_vars": num_vars}
 
     for col in cat_vars:
-        orig_freq = orig_df[col].astype(str).value_counts(normalize=True).mul(100).round(1)
-        synth_freq = synth_df[col].astype(str).value_counts(normalize=True).mul(100).round(1)
+        orig_freq = _norm_series(orig_df[col]).value_counts(normalize=True).mul(100).round(1)
+        synth_freq = _norm_series(synth_df[col]).value_counts(normalize=True).mul(100).round(1)
         all_cats = sorted(set(orig_freq.index) | set(synth_freq.index))
         report["cat_freq"][col] = [
             {
@@ -94,12 +116,11 @@ def build_synth_report(orig_df, synth_df, variable_types):
             })
 
     for col in cat_vars:
-        all_cats = sorted(
-            set(orig_df[col].dropna().astype(str)) |
-            set(synth_df[col].dropna().astype(str))
-        )
-        real_counts = orig_df[col].astype(str).value_counts().reindex(all_cats, fill_value=0)
-        synth_counts = synth_df[col].astype(str).value_counts().reindex(all_cats, fill_value=0)
+        orig_norm = _norm_series(orig_df[col].dropna())
+        synth_norm = _norm_series(synth_df[col].dropna())
+        all_cats = sorted(set(orig_norm) | set(synth_norm))
+        real_counts = orig_norm.value_counts().reindex(all_cats, fill_value=0)
+        synth_counts = synth_norm.value_counts().reindex(all_cats, fill_value=0)
         scale = len(orig_df) / max(len(synth_df), 1)
         expected = (synth_counts * scale).clip(lower=0.5)
         total_exp = expected.sum()
