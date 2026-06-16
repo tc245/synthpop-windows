@@ -454,6 +454,7 @@ class ConfigTab(QWidget):
                 self._n_rows.value(),
                 self._build_method_kwargs(),
                 self._skip_imputation.isChecked(),
+                variable_types=self._variable_types,
             )
             self._estimate_label.setText(
                 f"Estimated: ~{result['estimate']}  "
@@ -486,6 +487,7 @@ class ConfigTab(QWidget):
             self._build_method_kwargs(),
             self._max_train_rows.value(),
             self._skip_imputation.isChecked(),
+            variable_types=self._variable_types,
         )
 
         self._thread = QThread()

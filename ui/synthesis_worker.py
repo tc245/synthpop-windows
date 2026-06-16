@@ -22,13 +22,15 @@ class SynthesisWorker(QObject):
     error = Signal(str)
     cancelled = Signal()
 
-    def setup(self, df, method, n_rows, method_kwargs, max_train_rows, skip_imputation):
+    def setup(self, df, method, n_rows, method_kwargs, max_train_rows, skip_imputation,
+              variable_types=None):
         self._df = df
         self._method = method
         self._n_rows = n_rows
         self._method_kwargs = method_kwargs
         self._max_train_rows = max_train_rows
         self._skip_imputation = skip_imputation
+        self._variable_types = variable_types
         self.cancel_event = threading.Event()
 
     @Slot()
@@ -44,6 +46,7 @@ class SynthesisWorker(QObject):
                 self._skip_imputation,
                 self._emit_progress,
                 self.cancel_event,
+                variable_types=self._variable_types,
             )
             self.finished.emit(synth_df, n_dupes)
         except CancelledError:

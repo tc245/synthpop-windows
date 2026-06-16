@@ -107,9 +107,24 @@ def _sanitise_for_synthesis(df):
     return df, drop
 
 
+def _apply_variable_types(metadata: dict, variable_types: dict) -> dict:
+    """Override auto-detected DataProcessor metadata with user-specified types.
+
+    Without this, integer-coded categoricals (dtype int64) are auto-detected
+    as 'numerical' and go through StandardScaler instead of LabelEncoder,
+    producing continuous float output whose labels never match the originals.
+    """
+    _map = {"categorical": "categorical", "numeric": "numerical"}
+    for col, vtype in (variable_types or {}).items():
+        if col in metadata and vtype in _map:
+            metadata[col] = _map[vtype]
+    return metadata
+
+
 def run_synthesis(
     df, method, n_rows, method_kwargs, max_train_rows,
-    skip_imputation, progress_callback, cancel_event=None
+    skip_imputation, progress_callback, cancel_event=None,
+    variable_types=None,
 ):
     """Run synthesis synchronously, calling progress_callback(pct, msg) at each step.
 
@@ -159,7 +174,7 @@ def run_synthesis(
         train_df = real_df
         _cb(15, f"Step 2 of 5 — Preprocessing {n_cols} variable(s)…")
 
-    metadata = handler.get_column_dtypes(train_df)
+    metadata = _apply_variable_types(handler.get_column_dtypes(train_df), variable_types)
     processor = DataProcessor(metadata)
     processed_data = processor.preprocess(train_df)
 
@@ -256,7 +271,7 @@ def _fmt_time(seconds):
     return f"{m}m {s}s" if m else f"{s}s"
 
 
-def estimate_time(df, method, max_train_rows, n_rows_out, method_kwargs, skip_imputation):
+def estimate_time(df, method, max_train_rows, n_rows_out, method_kwargs, skip_imputation, variable_types=None):
     """Run a micro-benchmark on ≤2,000 rows and extrapolate synthesis time.
 
     Returns a dict with 'estimate' (human-readable string) and timing details.
@@ -274,7 +289,7 @@ def estimate_time(df, method, max_train_rows, n_rows_out, method_kwargs, skip_im
     else:
         real_df = handler.apply_imputation(bench_df, handler.detect_missingness(bench_df))
 
-    metadata = handler.get_column_dtypes(real_df)
+    metadata = _apply_variable_types(handler.get_column_dtypes(real_df), variable_types)
     processor = DataProcessor(metadata)
     processed = processor.preprocess(real_df)
 
