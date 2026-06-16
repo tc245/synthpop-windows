@@ -374,6 +374,9 @@ class ConfigTab(QWidget):
         self._worker.error.connect(self._thread.quit)
         self._worker.cancelled.connect(self._thread.quit)
 
+        # Drop references only after the OS thread has fully unwound
+        self._thread.finished.connect(self._cleanup_thread)
+
         self._thread.start()
 
     def _cancel(self):
@@ -414,5 +417,8 @@ class ConfigTab(QWidget):
         self._estimate_btn.setEnabled(True)
         self._cancel_btn.setVisible(False)
         self._cancel_btn.setEnabled(True)
+
+    @Slot()
+    def _cleanup_thread(self):
         self._worker = None
         self._thread = None

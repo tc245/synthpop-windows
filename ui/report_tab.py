@@ -82,6 +82,7 @@ class ReportTab(QWidget):
         self._worker.error.connect(self._on_report_error)
         self._worker.finished.connect(self._thread.quit)
         self._worker.error.connect(self._thread.quit)
+        self._thread.finished.connect(self._cleanup_thread)
 
         self._thread.start()
 
@@ -98,8 +99,6 @@ class ReportTab(QWidget):
         )
         self._browser.setHtml(html)
         self._save_html_btn.setEnabled(True)
-        self._worker = None
-        self._thread = None
 
     @Slot(str)
     def _on_report_error(self, err: str):
@@ -109,6 +108,9 @@ class ReportTab(QWidget):
             f"<p style='color:red;'>Report generation failed:<br>{err}</p>"
         )
         QMessageBox.warning(self, "Report error", err)
+
+    @Slot()
+    def _cleanup_thread(self):
         self._worker = None
         self._thread = None
 
