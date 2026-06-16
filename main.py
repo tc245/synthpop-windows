@@ -8,8 +8,11 @@ def main():
     _patch_synthpop()
 
     app = QApplication(sys.argv)
-    app.setApplicationName("SynthPop Desktop")
-    app.setOrganizationName("SynthPop")
+    app.setApplicationName("SLS Synthetic Data Generator")
+    app.setOrganizationName("SLS-DSU")
+
+    from ui.style import APP_QSS
+    app.setStyleSheet(APP_QSS)
 
     from ui.main_window import MainWindow
     window = MainWindow()

@@ -155,8 +155,8 @@ class ConfigTab(QWidget):
         self._col_list = QListWidget()
         self._col_list.setFixedHeight(180)
         col_layout.addWidget(self._col_list)
-        self._col_hint = QLabel("(ignored-type columns are excluded automatically)")
-        self._col_hint.setStyleSheet("color: #777; font-size: 11px;")
+        self._col_hint = QLabel("Ignored-type columns are excluded automatically.")
+        self._col_hint.setStyleSheet("color: #777777; font-size: 11px; font-style: italic;")
         col_layout.addWidget(self._col_hint)
         form_layout.addWidget(col_box)
 
@@ -168,7 +168,12 @@ class ConfigTab(QWidget):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setSpacing(6)
-        right_layout.addWidget(QLabel("Progress"))
+        progress_heading = QLabel("Progress")
+        progress_heading.setStyleSheet(
+            "font-weight: bold; font-size: 12px; color: #5a3a8e;"
+            " padding-left: 8px; border-left: 3px solid #9063CD;"
+        )
+        right_layout.addWidget(progress_heading)
 
         self._progress_bar = QProgressBar()
         self._progress_bar.setRange(0, 100)
@@ -176,7 +181,7 @@ class ConfigTab(QWidget):
         right_layout.addWidget(self._progress_bar)
 
         self._log_list = QListWidget()
-        self._log_list.setStyleSheet("font-size: 11px;")
+        self._log_list.setStyleSheet("font-size: 11px; font-family: Consolas, monospace;")
         right_layout.addWidget(self._log_list, stretch=1)
         splitter.addWidget(right)
 
@@ -193,12 +198,13 @@ class ConfigTab(QWidget):
         self._estimate_btn = QPushButton("Estimate synthesis time")
         self._estimate_btn.setFixedWidth(180)
         self._estimate_label = QLabel("")
-        self._estimate_label.setStyleSheet("font-size: 11px; color: #333;")
+        self._estimate_label.setStyleSheet("font-size: 11px; color: #5a3a8e;")
         self._estimate_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._generate_btn = QPushButton("Generate Synthetic Data")
-        self._generate_btn.setStyleSheet("font-weight: bold; padding: 5px 12px;")
-        self._generate_btn.setFixedWidth(190)
+        self._generate_btn = QPushButton("Generate Synthetic Data  →")
+        self._generate_btn.setProperty("role", "primary")
+        self._generate_btn.setFixedWidth(210)
         self._cancel_btn = QPushButton("Cancel")
+        self._cancel_btn.setProperty("role", "cancel")
         self._cancel_btn.setFixedWidth(80)
         self._cancel_btn.setVisible(False)
         btn_row.addWidget(self._estimate_btn)

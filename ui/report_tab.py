@@ -53,19 +53,23 @@ class ReportTab(QWidget):
         notice = QLabel(_PRIVACY_NOTICE)
         notice.setWordWrap(True)
         notice.setStyleSheet(
-            "background: #fff3cd; border: 1px solid #ffc107; "
-            "padding: 6px 10px; border-radius: 4px; font-size: 11px;"
+            "background: #ede8f8; border: 1px solid #9063CD;"
+            " border-left: 4px solid #5a3a8e;"
+            " padding: 6px 10px; border-radius: 4px; font-size: 11px;"
+            " color: #3d2570;"
         )
         root.addWidget(notice)
 
         # Top bar: status + export buttons
         top = QHBoxLayout()
         self._status_label = QLabel("Generating report…")
-        self._status_label.setStyleSheet("color: #555; font-size: 11px;")
+        self._status_label.setStyleSheet("color: #5a3a8e; font-size: 11px; font-style: italic;")
         self._save_csv_btn = QPushButton("Save Synthetic CSV…")
+        self._save_csv_btn.setProperty("role", "export")
         self._save_csv_btn.setEnabled(False)
         self._save_csv_btn.clicked.connect(self._save_csv)
         self._save_html_btn = QPushButton("Save Report as HTML…")
+        self._save_html_btn.setProperty("role", "export")
         self._save_html_btn.setEnabled(False)
         self._save_html_btn.clicked.connect(self._save_html)
         top.addWidget(self._status_label)

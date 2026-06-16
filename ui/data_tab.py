@@ -35,9 +35,11 @@ class DataTab(QWidget):
         # Top bar
         top = QHBoxLayout()
         self._open_btn = QPushButton("Open CSV…")
-        self._open_btn.setFixedWidth(120)
+        self._open_btn.setProperty("role", "export")
+        self._open_btn.setFixedWidth(130)
         self._open_btn.clicked.connect(self._open_csv)
         self._file_label = QLabel("No file loaded")
+        self._file_label.setStyleSheet("color: #777; font-style: italic;")
         self._file_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         top.addWidget(self._open_btn)
         top.addWidget(self._file_label)
@@ -45,7 +47,7 @@ class DataTab(QWidget):
 
         # Summary
         self._summary_label = QLabel("")
-        self._summary_label.setStyleSheet("color: #555;")
+        self._summary_label.setStyleSheet("color: #5a3a8e; font-weight: bold;")
         root.addWidget(self._summary_label)
 
         # Column type table
@@ -58,6 +60,7 @@ class DataTab(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(3, self._table.horizontalHeader().ResizeMode.ResizeToContents)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
         root.addWidget(self._table, stretch=3)
 
@@ -69,7 +72,7 @@ class DataTab(QWidget):
             "Check codes that should be treated as missing (NaN). "
             "Pre-checked codes are known sentinel patterns (e.g. -99, -999)."
         )
-        hint.setStyleSheet("color: #666; font-size: 11px;")
+        hint.setStyleSheet("color: #5a3a8e; font-size: 11px;")
         hint.setWordWrap(True)
         sent_layout.addWidget(hint)
 
@@ -84,9 +87,9 @@ class DataTab(QWidget):
         root.addWidget(self._sentinel_box)
 
         # Confirm button
-        self._confirm_btn = QPushButton("Apply sentinels && confirm variable types")
+        self._confirm_btn = QPushButton("Apply sentinels & confirm variable types  →")
         self._confirm_btn.setEnabled(False)
-        self._confirm_btn.setStyleSheet("font-weight: bold; padding: 6px;")
+        self._confirm_btn.setProperty("role", "primary")
         self._confirm_btn.clicked.connect(self._confirm)
         root.addWidget(self._confirm_btn)
 
