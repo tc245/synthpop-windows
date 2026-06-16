@@ -3,6 +3,6 @@ pandas>=2.0
 numpy>=1.24
 scipy>=1.11
 scikit-learn>=1.3
-python-synthpop>=0.5
+python-synthpop>=0.1.2
 matplotlib>=3.7
 pyinstaller>=6.0
