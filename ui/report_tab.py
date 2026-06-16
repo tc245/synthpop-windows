@@ -1,10 +1,30 @@
-from PySide6.QtCore import QThread, Slot
+import base64
+
+from PySide6.QtCore import QByteArray, QThread, QUrl, Slot
+from PySide6.QtGui import QImage
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextBrowser, QFileDialog, QMessageBox, QProgressBar,
 )
 
 from ui.synthesis_worker import ReportWorker
+
+
+class _DataUriBrowser(QTextBrowser):
+    """QTextBrowser that renders data: URI images inline."""
+
+    def loadResource(self, resource_type, url: QUrl):
+        s = url.toString()
+        if s.startswith("data:image/") and ";base64," in s:
+            try:
+                _, encoded = s.split(";base64,", 1)
+                img = QImage()
+                img.loadFromData(QByteArray(base64.b64decode(encoded)))
+                if not img.isNull():
+                    return img
+            except Exception:
+                pass
+        return super().loadResource(resource_type, url)
 
 _PRIVACY_NOTICE = (
     "<b>Privacy notice:</b> The synthetic dataset preserves statistical properties "
@@ -62,7 +82,7 @@ class ReportTab(QWidget):
         root.addWidget(self._progress)
 
         # Report browser
-        self._browser = QTextBrowser()
+        self._browser = _DataUriBrowser()
         self._browser.setOpenLinks(False)
         root.addWidget(self._browser, stretch=1)
 
