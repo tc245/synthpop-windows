@@ -20,6 +20,7 @@ class ReportTab(QWidget):
         super().__init__(parent)
         self._report = None
         self._html = None
+        self._synth_df = None
         self._worker = None
         self._thread = None
         self._build_ui()
@@ -37,21 +38,25 @@ class ReportTab(QWidget):
         )
         root.addWidget(notice)
 
-        # Top bar
+        # Top bar: status + export buttons
         top = QHBoxLayout()
         self._status_label = QLabel("Generating report…")
         self._status_label.setStyleSheet("color: #555; font-size: 11px;")
+        self._save_csv_btn = QPushButton("Save Synthetic CSV…")
+        self._save_csv_btn.setEnabled(False)
+        self._save_csv_btn.clicked.connect(self._save_csv)
         self._save_html_btn = QPushButton("Save Report as HTML…")
         self._save_html_btn.setEnabled(False)
         self._save_html_btn.clicked.connect(self._save_html)
         top.addWidget(self._status_label)
         top.addStretch()
+        top.addWidget(self._save_csv_btn)
         top.addWidget(self._save_html_btn)
         root.addLayout(top)
 
-        # Progress bar (shown while generating)
+        # Indeterminate progress bar shown while report is being generated
         self._progress = QProgressBar()
-        self._progress.setRange(0, 0)   # indeterminate
+        self._progress.setRange(0, 0)
         self._progress.setFixedHeight(6)
         self._progress.setVisible(False)
         root.addWidget(self._progress)
@@ -64,9 +69,11 @@ class ReportTab(QWidget):
     # ── Public API ────────────────────────────────────────────────────────────
 
     def set_data(self, orig_df, synth_df, variable_types):
-        """Start async report generation."""
+        """Store synth_df and start async report generation."""
+        self._synth_df = synth_df
         self._report = None
         self._html = None
+        self._save_csv_btn.setEnabled(True)
         self._save_html_btn.setEnabled(False)
         self._browser.setHtml("<p style='color:#888;'>Building report…</p>")
         self._progress.setVisible(True)
@@ -113,6 +120,18 @@ class ReportTab(QWidget):
     def _cleanup_thread(self):
         self._worker = None
         self._thread = None
+
+    def _save_csv(self):
+        if self._synth_df is None:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Synthetic CSV", "synthetic_data.csv", "CSV files (*.csv)"
+        )
+        if path:
+            try:
+                self._synth_df.to_csv(path, index=False)
+            except Exception as exc:
+                QMessageBox.critical(self, "Save error", str(exc))
 
     def _save_html(self):
         if not self._html:

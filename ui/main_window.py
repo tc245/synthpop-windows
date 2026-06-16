@@ -1,7 +1,5 @@
 from PySide6.QtCore import Slot
-from PySide6.QtWidgets import (
-    QMainWindow, QTabWidget, QFileDialog, QMessageBox, QApplication,
-)
+from PySide6.QtWidgets import QMainWindow, QTabWidget
 
 from ui.data_tab import DataTab
 from ui.config_tab import ConfigTab
@@ -21,9 +19,6 @@ class MainWindow(QMainWindow):
         self.synth_df = None
 
         self._build_ui()
-        self._build_menu()
-
-    # ── UI construction ───────────────────────────────────────────────────────
 
     def _build_ui(self):
         self._tabs = QTabWidget()
@@ -40,50 +35,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._tabs)
         self.statusBar().showMessage("Open a CSV file to begin.")
 
-        # Signal wiring
         self._data_tab.data_ready.connect(self._on_data_ready)
         self._config_tab.synthesis_complete.connect(self._on_synthesis_complete)
-
-    def _build_menu(self):
-        menu = self.menuBar()
-        file_menu = menu.addMenu("&File")
-
-        open_act = file_menu.addAction("&Open CSV…")
-        open_act.setShortcut("Ctrl+O")
-        open_act.triggered.connect(self._open_csv)
-
-        self._save_csv_act = file_menu.addAction("&Save Synthetic CSV…")
-        self._save_csv_act.setShortcut("Ctrl+S")
-        self._save_csv_act.setEnabled(False)
-        self._save_csv_act.triggered.connect(self._save_synth_csv)
-
-        file_menu.addSeparator()
-
-        exit_act = file_menu.addAction("E&xit")
-        exit_act.setShortcut("Ctrl+Q")
-        exit_act.triggered.connect(QApplication.quit)
-
-    # ── Menu actions ──────────────────────────────────────────────────────────
-
-    def _open_csv(self):
-        """Trigger the file-open dialog on the data tab."""
-        self._data_tab._open_csv()
-
-    def _save_synth_csv(self):
-        if self.synth_df is None:
-            QMessageBox.warning(self, "No data", "No synthetic dataset available.")
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Synthetic CSV", "synthetic_data.csv", "CSV files (*.csv)"
-        )
-        if path:
-            try:
-                self.synth_df.to_csv(path, index=False)
-                self.statusBar().showMessage(f"Saved: {path}")
-            except Exception as exc:
-                QMessageBox.critical(self, "Save error", str(exc))
-
-    # ── Tab signal handlers ───────────────────────────────────────────────────
 
     @Slot(object, object)
     def _on_data_ready(self, df, variable_types: dict):
@@ -94,7 +47,6 @@ class MainWindow(QMainWindow):
         self._config_tab.set_data(df, variable_types)
         self._tabs.setTabEnabled(1, True)
         self._tabs.setTabEnabled(2, False)
-        self._save_csv_act.setEnabled(False)
 
         self.statusBar().showMessage(
             f"Loaded: {len(df):,} rows × {len(df.columns)} columns  —  "
@@ -105,7 +57,6 @@ class MainWindow(QMainWindow):
     @Slot(object, int)
     def _on_synthesis_complete(self, synth_df, n_dupes: int):
         self.synth_df = synth_df
-        self._save_csv_act.setEnabled(True)
 
         self._report_tab.set_data(self.source_df, synth_df, self.variable_types)
         self._tabs.setTabEnabled(2, True)
