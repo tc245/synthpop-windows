@@ -47,7 +47,8 @@ class ReportTab(QWidget):
 
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setSpacing(6)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(8)
 
         # Privacy notice
         notice = QLabel(_PRIVACY_NOTICE)
@@ -60,10 +61,11 @@ class ReportTab(QWidget):
         )
         root.addWidget(notice)
 
-        # Top bar: status + export buttons
+        # Top bar: status badge + export buttons
         top = QHBoxLayout()
-        self._status_label = QLabel("Generating report…")
-        self._status_label.setStyleSheet("color: #5a3a8e; font-size: 11px; font-style: italic;")
+        self._status_label = QLabel("")
+        self._status_label.setFixedHeight(26)
+        self._set_status("loading", "Generating report…")
         self._save_csv_btn = QPushButton("Save Synthetic CSV…")
         self._save_csv_btn.setProperty("role", "export")
         self._save_csv_btn.setEnabled(False)
@@ -90,6 +92,21 @@ class ReportTab(QWidget):
         self._browser.setOpenLinks(False)
         root.addWidget(self._browser, stretch=1)
 
+    # ── Status badge ─────────────────────────────────────────────────────────
+
+    def _set_status(self, state: str, text: str):
+        _styles = {
+            "loading": ("background:#ede8f8; color:#5a3a8e; border:1px solid #9063CD;", "●  "),
+            "ready":   ("background:#e8f5e9; color:#2e7d32; border:1px solid #61a229;", "✓  "),
+            "error":   ("background:#fdecea; color:#c0392b; border:1px solid #c0392b;", "✗  "),
+        }
+        style, prefix = _styles.get(state, _styles["loading"])
+        self._status_label.setText(prefix + text)
+        self._status_label.setStyleSheet(
+            f"{style} font-size: 11px; font-weight: bold;"
+            " padding: 3px 10px; border-radius: 10px;"
+        )
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def set_data(self, orig_df, synth_df, variable_types):
@@ -101,7 +118,7 @@ class ReportTab(QWidget):
         self._save_html_btn.setEnabled(False)
         self._browser.setHtml("<p style='color:#888;'>Building report…</p>")
         self._progress.setVisible(True)
-        self._status_label.setText("Generating report…")
+        self._set_status("loading", "Generating report…")
 
         self._worker = ReportWorker()
         self._worker.setup(orig_df, synth_df, variable_types)
@@ -124,9 +141,10 @@ class ReportTab(QWidget):
         self._report = report
         self._html = html
         self._progress.setVisible(False)
-        self._status_label.setText(
+        self._set_status(
+            "ready",
             f"Report ready — {report['n_orig']:,} original rows, "
-            f"{report['n_synth']:,} synthetic rows"
+            f"{report['n_synth']:,} synthetic rows",
         )
         self._browser.setHtml(html)
         self._save_html_btn.setEnabled(True)
@@ -134,7 +152,7 @@ class ReportTab(QWidget):
     @Slot(str)
     def _on_report_error(self, err: str):
         self._progress.setVisible(False)
-        self._status_label.setText("Report generation failed.")
+        self._set_status("error", "Report generation failed.")
         self._browser.setHtml(
             f"<p style='color:red;'>Report generation failed:<br>{err}</p>"
         )

@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QSplitter,
     QPushButton, QLabel, QSpinBox, QCheckBox, QComboBox,
     QGroupBox, QRadioButton, QButtonGroup, QListWidget,
     QListWidgetItem, QProgressBar, QScrollArea, QMessageBox,
@@ -31,7 +32,8 @@ class ConfigTab(QWidget):
 
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setSpacing(6)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(8)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -40,107 +42,100 @@ class ConfigTab(QWidget):
         scroll.setWidgetResizable(True)
         form_widget = QWidget()
         form_layout = QVBoxLayout(form_widget)
-        form_layout.setSpacing(8)
+        form_layout.setSpacing(10)
 
-        # Synthesis settings group
+        # ── Synthesis settings group ──────────────────────────────────────────
         synth_box = QGroupBox("Synthesis settings")
-        synth_form = QVBoxLayout(synth_box)
+        synth_form = QFormLayout(synth_box)
+        synth_form.setLabelAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        synth_form.setSpacing(8)
 
-        # n_rows
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Output rows:"))
         self._n_rows = QSpinBox()
         self._n_rows.setRange(1, 10_000_000)
         self._n_rows.setValue(1000)
-        self._n_rows.setFixedWidth(110)
-        row.addWidget(self._n_rows)
-        row.addStretch()
-        synth_form.addLayout(row)
+        self._n_rows.setFixedWidth(120)
+        synth_form.addRow("Output rows:", self._n_rows)
 
-        # Method
-        method_row = QHBoxLayout()
-        method_row.addWidget(QLabel("Method:"))
+        method_widget = QWidget()
+        method_widget.setStyleSheet("background: transparent;")
+        method_layout = QHBoxLayout(method_widget)
+        method_layout.setContentsMargins(0, 0, 0, 0)
+        method_layout.setSpacing(12)
         self._cart_radio = QRadioButton("CART")
         self._gc_radio = QRadioButton("Gaussian Copula")
         self._cart_radio.setChecked(True)
         self._method_group = QButtonGroup(self)
         self._method_group.addButton(self._cart_radio, 0)
         self._method_group.addButton(self._gc_radio, 1)
-        method_row.addWidget(self._cart_radio)
-        method_row.addWidget(self._gc_radio)
-        method_row.addStretch()
-        synth_form.addLayout(method_row)
+        method_layout.addWidget(self._cart_radio)
+        method_layout.addWidget(self._gc_radio)
+        method_layout.addStretch()
+        synth_form.addRow("Method:", method_widget)
 
-        # CART options
+        # CART options (nested group)
         self._cart_box = QGroupBox("CART options")
-        cart_layout = QVBoxLayout(self._cart_box)
+        cart_form = QFormLayout(self._cart_box)
+        cart_form.setLabelAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        cart_form.setSpacing(6)
         self._smoothing = QCheckBox("Smoothing")
         self._proper = QCheckBox("Proper synthesis")
-        cart_layout.addWidget(self._smoothing)
-        cart_layout.addWidget(self._proper)
-        mb_row = QHBoxLayout()
-        mb_row.addWidget(QLabel("Minibucket:"))
+        cart_form.addRow(self._smoothing)
+        cart_form.addRow(self._proper)
         self._minibucket = QSpinBox()
         self._minibucket.setRange(1, 1000)
         self._minibucket.setValue(5)
         self._minibucket.setFixedWidth(80)
-        mb_row.addWidget(self._minibucket)
-        mb_row.addStretch()
-        cart_layout.addLayout(mb_row)
-        rs_row = QHBoxLayout()
-        rs_row.addWidget(QLabel("Random state:"))
+        cart_form.addRow("Minibucket:", self._minibucket)
         self._random_state = QSpinBox()
         self._random_state.setRange(0, 99999)
         self._random_state.setValue(42)
         self._random_state.setFixedWidth(80)
-        rs_row.addWidget(self._random_state)
-        rs_row.addStretch()
-        cart_layout.addLayout(rs_row)
-        synth_form.addWidget(self._cart_box)
+        cart_form.addRow("Random state:", self._random_state)
+        synth_form.addRow(self._cart_box)
 
-        # GC options
+        # GC options (nested group)
         self._gc_box = QGroupBox("Gaussian Copula options")
-        gc_layout = QVBoxLayout(self._gc_box)
+        gc_form = QFormLayout(self._gc_box)
+        gc_form.setLabelAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        gc_form.setSpacing(6)
         self._enforce_min_max = QCheckBox("Enforce min/max values")
         self._enforce_min_max.setChecked(True)
         self._enforce_rounding = QCheckBox("Enforce rounding")
         self._enforce_rounding.setChecked(True)
-        gc_layout.addWidget(self._enforce_min_max)
-        gc_layout.addWidget(self._enforce_rounding)
-        dist_row = QHBoxLayout()
-        dist_row.addWidget(QLabel("Default distribution:"))
+        gc_form.addRow(self._enforce_min_max)
+        gc_form.addRow(self._enforce_rounding)
         self._default_dist = QComboBox()
         self._default_dist.addItems(_GC_DISTRIBUTIONS)
-        dist_row.addWidget(self._default_dist)
-        dist_row.addStretch()
-        gc_layout.addLayout(dist_row)
+        gc_form.addRow("Default distribution:", self._default_dist)
         self._gc_box.setVisible(False)
-        synth_form.addWidget(self._gc_box)
+        synth_form.addRow(self._gc_box)
 
-        # skip_imputation
         self._skip_imputation = QCheckBox("Skip missing-data imputation")
         self._skip_imputation.setChecked(True)
-        synth_form.addWidget(self._skip_imputation)
+        synth_form.addRow(self._skip_imputation)
 
-        # max_train_rows
-        mtr_row = QHBoxLayout()
-        mtr_row.addWidget(QLabel("Max training rows:"))
         self._max_train_rows = QSpinBox()
         self._max_train_rows.setRange(100, 10_000_000)
         self._max_train_rows.setValue(20000)
-        self._max_train_rows.setFixedWidth(110)
-        mtr_row.addWidget(self._max_train_rows)
-        mtr_row.addStretch()
-        synth_form.addLayout(mtr_row)
+        self._max_train_rows.setFixedWidth(120)
+        synth_form.addRow("Max training rows:", self._max_train_rows)
+
         self._mtr_warning = QLabel(
             "Warning: training on >50,000 rows may take a very long time."
         )
-        self._mtr_warning.setStyleSheet("color: orange; font-size: 11px;")
+        self._mtr_warning.setStyleSheet("color: #e65100; font-size: 11px;")
         self._mtr_warning.setVisible(False)
-        synth_form.addWidget(self._mtr_warning)
+        synth_form.addRow(self._mtr_warning)
+
         form_layout.addWidget(synth_box)
 
-        # Column selection group
+        # ── Column selection group ────────────────────────────────────────────
         col_box = QGroupBox("Column selection")
         col_layout = QVBoxLayout(col_box)
         sel_btns = QHBoxLayout()
@@ -156,7 +151,9 @@ class ConfigTab(QWidget):
         self._col_list.setFixedHeight(180)
         col_layout.addWidget(self._col_list)
         self._col_hint = QLabel("Ignored-type columns are excluded automatically.")
-        self._col_hint.setStyleSheet("color: #777777; font-size: 11px; font-style: italic;")
+        self._col_hint.setStyleSheet(
+            "color: #777777; font-size: 11px; font-style: italic;"
+        )
         col_layout.addWidget(self._col_hint)
         form_layout.addWidget(col_box)
 
@@ -167,7 +164,9 @@ class ConfigTab(QWidget):
         # ── Right: progress panel ─────────────────────────────────────────────
         right = QWidget()
         right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         right_layout.setSpacing(6)
+
         progress_heading = QLabel("Progress")
         progress_heading.setStyleSheet(
             "font-weight: bold; font-size: 12px; color: #5a3a8e;"
@@ -181,7 +180,9 @@ class ConfigTab(QWidget):
         right_layout.addWidget(self._progress_bar)
 
         self._log_list = QListWidget()
-        self._log_list.setStyleSheet("font-size: 11px; font-family: Consolas, monospace;")
+        self._log_list.setStyleSheet(
+            "font-size: 11px; font-family: Consolas, monospace;"
+        )
         right_layout.addWidget(self._log_list, stretch=1)
         splitter.addWidget(right)
 
@@ -191,10 +192,11 @@ class ConfigTab(QWidget):
         # ── Bottom: action buttons ────────────────────────────────────────────
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color: #ccc;")
+        sep.setStyleSheet("background: #d0c5e8; max-height: 1px;")
         root.addWidget(sep)
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
         self._estimate_btn = QPushButton("Estimate synthesis time")
         self._estimate_btn.setFixedWidth(180)
         self._estimate_label = QLabel("")
@@ -312,9 +314,20 @@ class ConfigTab(QWidget):
         self._log_list.clear()
 
     def _add_log(self, msg: str):
-        if msg:
-            self._log_list.addItem(msg)
-            self._log_list.scrollToBottom()
+        if not msg:
+            return
+        item = QListWidgetItem(msg)
+        lower = msg.lower()
+        if lower.startswith("done") or lower.startswith("complete") or "generated" in lower:
+            item.setForeground(QColor("#2e7d32"))   # green
+        elif lower.startswith("error") or "failed" in lower:
+            item.setForeground(QColor("#c0392b"))   # red
+        elif lower.startswith("cancel") or lower.startswith("warning") or "warning:" in lower:
+            item.setForeground(QColor("#e65100"))   # orange
+        else:
+            item.setForeground(QColor("#444444"))
+        self._log_list.addItem(item)
+        self._log_list.scrollToBottom()
 
     # ── Estimate time ─────────────────────────────────────────────────────────
 
@@ -380,7 +393,6 @@ class ConfigTab(QWidget):
         self._worker.error.connect(self._thread.quit)
         self._worker.cancelled.connect(self._thread.quit)
 
-        # Drop references only after the OS thread has fully unwound
         self._thread.finished.connect(self._cleanup_thread)
 
         self._thread.start()
