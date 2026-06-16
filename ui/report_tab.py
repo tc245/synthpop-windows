@@ -1,7 +1,8 @@
 import base64
+import os
+import tempfile
 
-from PySide6.QtCore import QByteArray, QThread, QUrl, Slot
-from PySide6.QtGui import QImage, QTextDocument
+from PySide6.QtCore import QThread, QUrl, Slot
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextBrowser, QFileDialog, QMessageBox, QProgressBar,
@@ -26,7 +27,20 @@ class ReportTab(QWidget):
         self._synth_df = None
         self._worker = None
         self._thread = None
+        self._heatmap_tmp: str | None = None
         self._build_ui()
+
+    def _drop_heatmap_tmp(self):
+        if self._heatmap_tmp:
+            try:
+                os.unlink(self._heatmap_tmp)
+            except OSError:
+                pass
+            self._heatmap_tmp = None
+
+    def closeEvent(self, event):
+        self._drop_heatmap_tmp()
+        super().closeEvent(event)
 
     def _build_ui(self):
         root = QVBoxLayout(self)
@@ -94,6 +108,7 @@ class ReportTab(QWidget):
 
     def set_data(self, orig_df, synth_df, variable_types):
         """Store synth_df and start async report generation."""
+        self._drop_heatmap_tmp()
         self._synth_df = synth_df
         self._report = None
         self._html = None
@@ -122,7 +137,7 @@ class ReportTab(QWidget):
     @Slot(dict, str)
     def _on_report_ready(self, report: dict, html: str):
         self._report = report
-        self._html = html  # keep original data: URI version for saving
+        self._html = html  # keep original data: URI version for Save HTML
         self._progress.setVisible(False)
         self._set_status(
             "ready",
@@ -130,25 +145,26 @@ class ReportTab(QWidget):
             f"{report['n_synth']:,} synthetic rows",
         )
 
-        # Pre-register the heatmap image as a named document resource.
-        # Qt's URL handling truncates very long data: URIs before passing them
-        # to loadResource(), so we must register the decoded image up-front and
-        # replace the data: URI in the display HTML with the resource name.
+        # QTextBrowser cannot render data: URI images (Qt truncates the URL
+        # before passing it to loadResource).  Write the PNG to a temp file
+        # and use a file:// URL instead — QTextBrowser handles those natively.
+        self._drop_heatmap_tmp()
         display_html = html
         b64 = report.get("corr_heatmap_b64")
         if b64:
-            img = QImage()
-            img.loadFromData(QByteArray(base64.b64decode(b64)))
-            if not img.isNull():
-                self._browser.document().addResource(
-                    QTextDocument.ResourceType.ImageResource,
-                    QUrl("corr_heatmap.png"),
-                    img,
-                )
+            try:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".png", delete=False
+                ) as fh:
+                    fh.write(base64.b64decode(b64))
+                    self._heatmap_tmp = fh.name
+                file_url = QUrl.fromLocalFile(self._heatmap_tmp).toString()
                 display_html = html.replace(
                     f"src='data:image/png;base64,{b64}'",
-                    "src='corr_heatmap.png'",
+                    f"src='{file_url}'",
                 )
+            except Exception:
+                pass  # fall back to HTML without image
 
         self._browser.setHtml(display_html)
         self._save_html_btn.setEnabled(True)
