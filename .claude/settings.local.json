@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(mkdir -p core ui packaging)",
+      "Bash(python -m py_compile main.py core/data_io.py core/synthesis.py core/report.py ui/synthesis_worker.py ui/data_tab.py ui/config_tab.py ui/report_tab.py ui/main_window.py)",
+      "Bash(python3 -m py_compile main.py core/data_io.py core/synthesis.py core/report.py)",
+      "Bash(python3 *)",
+      "Bash(git -C /workspace/synthpop-windows add -A)",
+      "Bash(git -C /workspace/synthpop-windows status)"
+    ]
+  }
+}
