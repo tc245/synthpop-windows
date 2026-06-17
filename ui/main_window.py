@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
         h.addStretch()
 
         org = QLabel("Scottish Longitudinal Study Development & Support Unit")
-        org.setStyleSheet("color: #c0a8e8; font-size: 10px; background: transparent;")
+        org.setStyleSheet("color: #c0a8e8; font-size: 13px; background: transparent;")
         h.addWidget(org)
 
         return header
@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
 
         wrapper_layout.addWidget(self._tabs)
         self.setCentralWidget(wrapper)
+        self.statusBar().setStyleSheet("font-size: 13px;")
         self.statusBar().showMessage("Open a CSV file to begin.")
 
         self._data_tab.data_ready.connect(self._on_data_ready)
