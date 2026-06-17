@@ -129,9 +129,8 @@ def _render_pdf_html(report: dict) -> str:
     # ── Correlation heatmap ───────────────────────────────────────────────────
     if report.get("corr_heatmap_b64"):
         p.append(f"<h2 style='{_H2}'>Correlation Structure — Real vs Synthetic</h2>")
-        p.append(
-            f"<img src='data:image/png;base64,{report[\"corr_heatmap_b64\"]}' width='100%'/>"
-        )
+        heatmap_b64 = report["corr_heatmap_b64"]
+        p.append(f"<img src='data:image/png;base64,{heatmap_b64}' width='100%'/>")
         if report.get("mean_corr_diff") is not None:
             p.append(
                 f"<p style='text-align:center;color:#555;'>"
