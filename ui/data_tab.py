@@ -168,7 +168,7 @@ class DataTab(QWidget):
             "using CART or Gaussian Copula synthesis methods."
         )
         desc.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        desc.setStyleSheet("color: #888888; font-size: 12px; background: transparent;")
+        desc.setStyleSheet("color: #888888; font-size: 14px; background: transparent;")
         layout.addWidget(desc)
 
         layout.addSpacing(24)
@@ -191,7 +191,7 @@ class DataTab(QWidget):
             "Step 1: Load data   →   Step 2: Configure & Generate   →   Step 3: Review & Export"
         )
         steps.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        steps.setStyleSheet("color: #bbbbbb; font-size: 10px; background: transparent;")
+        steps.setStyleSheet("color: #bbbbbb; font-size: 13px; background: transparent;")
         layout.addWidget(steps)
 
         layout.addStretch()
