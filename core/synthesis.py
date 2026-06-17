@@ -12,12 +12,12 @@ class CancelledError(Exception):
 def _patch_synthpop():
     """Fix synthpop's DataProcessor to always use LabelEncoder (never OneHotEncoder).
 
-    Bug: preprocess() / _preprocess() may switch to OHE for categorical columns
-    with >=10 unique values, then KeyErrors in postprocess because original column
-    names are gone.
-    Fix: patch BOTH the public and private preprocess method names so the fix
-    applies regardless of how synthpop's internal call chain is structured.
-    Always use LabelEncoder, converting NaN to '__NA__' first.
+    Bug: _preprocess() switches to OHE for categorical columns with >=10 unique values,
+    then KeyErrors in postprocess because original column names are gone.
+    Fix: always use LabelEncoder, converting NaN to '__NA__' first.
+    Only _preprocess and postprocess are patched (not the public preprocess) so the
+    original preprocess() can still perform whatever setup it needs before delegating
+    to _preprocess().
     """
     try:
         from synthpop.processor.data_processor import DataProcessor
@@ -25,22 +25,11 @@ def _patch_synthpop():
 
         def _fixed_preprocess(self, data: pd.DataFrame) -> pd.DataFrame:
             data = data.copy()
-            # Defensive initialisation — some synthpop versions set these in the
-            # original preprocess() before calling _preprocess(); patching the
-            # public method directly means __init__ may be the only prior call.
-            if not hasattr(self, "original_columns") or self.original_columns is None:
-                self.original_columns = list(data.columns)
-            if not hasattr(self, "encoders") or self.encoders is None:
-                self.encoders = {}
-            if not hasattr(self, "scalers") or self.scalers is None:
-                self.scalers = {}
             for col, dtype in self.metadata.items():
-                if col not in data.columns:
-                    continue
                 if dtype == "categorical":
-                    series = data[col].astype(object).fillna("__NA__").astype(str)
+                    raw = data[col].where(data[col].notna(), other="__NA__").astype(str)
                     encoder = LabelEncoder()
-                    data[col] = encoder.fit_transform(series)
+                    data[col] = encoder.fit_transform(raw)
                     self.encoders[col] = encoder
                 elif dtype == "numerical":
                     scaler = StandardScaler(with_mean=False, with_std=False)
@@ -63,23 +52,14 @@ def _patch_synthpop():
                     continue
                 try:
                     if dtype == "categorical" and col in self.encoders:
-                        clipped = (
+                        labels = (
                             data[col]
                             .round()
                             .clip(0, len(self.encoders[col].classes_) - 1)
+                            .astype(int)
                         )
-                        # NaN cannot be cast to int; track null positions,
-                        # fill with 0 for decode, then restore NaN afterwards.
-                        null_mask = clipped.isna()
-                        int_codes = clipped.fillna(0).astype(int)
-                        decoded = pd.Series(
-                            self.encoders[col].inverse_transform(int_codes),
-                            index=data[col].index,
-                            dtype=object,
-                        )
-                        decoded = decoded.replace("__NA__", np.nan)
-                        decoded[null_mask] = np.nan
-                        data[col] = decoded
+                        data[col] = self.encoders[col].inverse_transform(labels)
+                        data[col] = data[col].replace("__NA__", np.nan)
                     elif dtype == "numerical" and col in self.scalers:
                         data[col] = self.scalers[col].inverse_transform(data[[col]])
                     elif dtype == "boolean":
@@ -93,9 +73,6 @@ def _patch_synthpop():
             out_cols = [c for c in self.original_columns if c in data.columns]
             return data[out_cols]
 
-        # Patch both the public and private names — synthpop versions differ in
-        # whether preprocess() delegates to _preprocess() or contains the logic itself.
-        DataProcessor.preprocess = _fixed_preprocess
         DataProcessor._preprocess = _fixed_preprocess
         DataProcessor.postprocess = _fixed_postprocess
     except Exception:
