@@ -25,6 +25,7 @@ datas = (
     collect_data_files("matplotlib")
     + collect_data_files("scipy")
     + [(str(ROOT / "assets" / "icon.png"), "assets")]
+    + [(str(ROOT / "assets" / "icon.ico"), "assets")]
 )
 
 a = Analysis(
