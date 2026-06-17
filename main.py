@@ -24,23 +24,36 @@ def _set_windows_appid():
 
 
 def _set_win32_icon(hwnd, ico_path: str):
-    """Send WM_SETICON directly to the window handle for reliable taskbar icon."""
+    """Send WM_SETICON directly to the window handle for reliable taskbar icon.
+
+    Specifies explicit ctypes argtypes so HICON handles are not truncated
+    to 32-bit on 64-bit Windows.  Loads separate handles at 16 px (taskbar)
+    and 32 px (alt-tab) because Windows uses different slots for each.
+    """
     try:
         import ctypes
-        IMAGE_ICON = 1
-        LR_LOADFROMFILE = 0x00000010
-        LR_DEFAULTSIZE = 0x00000040
-        WM_SETICON = 0x0080
-        ICON_SMALL = 0
-        ICON_BIG = 1
+        import ctypes.wintypes as wt
 
-        hicon = ctypes.windll.user32.LoadImageW(
-            None, ico_path, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE
-        )
-        if hicon:
-            send = ctypes.windll.user32.SendMessageW
-            send(hwnd, WM_SETICON, ICON_SMALL, hicon)
-            send(hwnd, WM_SETICON, ICON_BIG, hicon)
+        user32 = ctypes.windll.user32
+        user32.LoadImageW.restype = ctypes.c_void_p
+        user32.LoadImageW.argtypes = [
+            wt.HANDLE, wt.LPCWSTR, wt.UINT, ctypes.c_int, ctypes.c_int, wt.UINT,
+        ]
+        user32.SendMessageW.restype = ctypes.c_void_p
+        user32.SendMessageW.argtypes = [
+            wt.HWND, wt.UINT, wt.WPARAM, ctypes.c_void_p,
+        ]
+
+        IMAGE_ICON    = 1
+        LR_LOADFROMFILE = 0x00000010
+        WM_SETICON    = 0x0080
+
+        hicon_small = user32.LoadImageW(None, ico_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+        hicon_large = user32.LoadImageW(None, ico_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
+        if hicon_small:
+            user32.SendMessageW(hwnd, WM_SETICON, 0, hicon_small)  # ICON_SMALL
+        if hicon_large:
+            user32.SendMessageW(hwnd, WM_SETICON, 1, hicon_large)  # ICON_BIG
     except Exception:
         pass
 
