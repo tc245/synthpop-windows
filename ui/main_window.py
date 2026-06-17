@@ -111,6 +111,22 @@ class MainWindow(QMainWindow):
         wrapper_layout.addWidget(self._build_header())
 
         self._tabs = QTabWidget()
+        self._tabs.setStyleSheet(
+            "QTabBar::tab {"
+            "  background: #d8cce8; color: #3d2570;"
+            "  padding: 6px 18px; font-size: 13px; font-weight: bold;"
+            "  border: 1px solid #b89ee0; border-bottom: none;"
+            "  border-top-left-radius: 4px; border-top-right-radius: 4px;"
+            "  margin-right: 2px;"
+            "}"
+            "QTabBar::tab:selected {"
+            "  background: #5a3a8e; color: white;"
+            "  border-color: #5a3a8e;"
+            "}"
+            "QTabBar::tab:hover:!selected { background: #c4b0dc; }"
+            "QTabBar::tab:disabled { color: #aaa; background: #ede8f8; }"
+            "QTabWidget::pane { border: 1px solid #b89ee0; }"
+        )
         self._data_tab = DataTab()
         self._config_tab = ConfigTab()
         self._report_tab = ReportTab()
