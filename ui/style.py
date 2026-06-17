@@ -314,10 +314,12 @@ QRadioButton::indicator:hover {{
 
 /* ── Menu bar ────────────────────────────────────────── */
 QMenuBar {{
-    background: {PURPLE_DARK};
-    color: white;
+    background: {PURPLE_LIGHT};
+    color: {PURPLE_DARK};
     padding: 2px 4px;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: bold;
+    border-bottom: 1px solid {BORDER};
 }}
 QMenuBar::item {{
     padding: 4px 10px;
@@ -325,7 +327,8 @@ QMenuBar::item {{
     border-radius: 3px;
 }}
 QMenuBar::item:selected {{
-    background: {PURPLE};
+    background: {BORDER};
+    color: {PURPLE_DARK};
 }}
 QMenu {{
     background: white;
