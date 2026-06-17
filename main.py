@@ -44,9 +44,9 @@ def _set_win32_icon(hwnd, ico_path: str):
             wt.HWND, wt.UINT, wt.WPARAM, ctypes.c_void_p,
         ]
 
-        IMAGE_ICON    = 1
+        IMAGE_ICON      = 1
         LR_LOADFROMFILE = 0x00000010
-        WM_SETICON    = 0x0080
+        WM_SETICON      = 0x0080
 
         hicon_small = user32.LoadImageW(None, ico_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
         hicon_large = user32.LoadImageW(None, ico_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
@@ -58,15 +58,90 @@ def _set_win32_icon(hwnd, ico_path: str):
         pass
 
 
+def _make_splash_pixmap():
+    """Build a branded splash-screen pixmap without needing an extra asset file."""
+    from PySide6.QtCore import Qt, QRect
+    from PySide6.QtGui import (
+        QColor, QFont, QLinearGradient, QPainter, QPixmap, QPen,
+    )
+
+    W, H = 500, 300
+    pix = QPixmap(W, H)
+    pix.fill(QColor("#3d2570"))
+
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+    # Gradient background: dark purple -> slightly lighter at bottom
+    grad = QLinearGradient(0, 0, 0, H)
+    grad.setColorAt(0.0, QColor("#3d2570"))
+    grad.setColorAt(1.0, QColor("#5a3a8e"))
+    p.fillRect(0, 0, W, H, grad)
+
+    # Accent bar across the top
+    p.fillRect(0, 0, W, 6, QColor("#9063CD"))
+
+    # App title
+    font_title = QFont("Arial", 30, QFont.Weight.Bold)
+    p.setFont(font_title)
+    p.setPen(QColor("#ffffff"))
+    p.drawText(QRect(0, 60, W, 60), Qt.AlignmentFlag.AlignHCenter, "SLS SynthPop")
+
+    # Subtitle
+    font_sub = QFont("Arial", 13)
+    p.setFont(font_sub)
+    p.setPen(QColor("#c9b8f0"))
+    p.drawText(
+        QRect(0, 122, W, 30),
+        Qt.AlignmentFlag.AlignHCenter,
+        "Synthetic Data Generator",
+    )
+
+    # Thin divider
+    p.setPen(QPen(QColor("#7a55b0"), 1))
+    p.drawLine(60, 165, W - 60, 165)
+
+    # Organisation label
+    font_org = QFont("Arial", 10)
+    p.setFont(font_org)
+    p.setPen(QColor("#a090cc"))
+    p.drawText(
+        QRect(0, 175, W, 24),
+        Qt.AlignmentFlag.AlignHCenter,
+        "Scottish Longitudinal Study Development and Support Unit",
+    )
+
+    # Status message area (bottom strip)
+    p.fillRect(0, H - 40, W, 40, QColor("#2a1850"))
+
+    p.end()
+    return pix
+
+
+def _splash_msg(splash, msg: str):
+    """Update splash message and force a repaint before blocking work."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor
+    splash.showMessage(
+        msg,
+        Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter,
+        QColor("#c9b8f0"),
+    )
+    QApplication.processEvents()
+
+
 def main():
     _set_windows_appid()
-
-    from core.synthesis import _patch_synthpop
-    _patch_synthpop()
 
     app = QApplication(sys.argv)
     app.setApplicationName("SLS Synthetic Data Generator")
     app.setOrganizationName("SLS-DSU")
+
+    # Show splash before any heavy imports so the user sees something immediately
+    from PySide6.QtWidgets import QSplashScreen
+    splash = QSplashScreen(_make_splash_pixmap())
+    splash.show()
+    _splash_msg(splash, "Starting up...")
 
     # Prefer .ico on Windows (contains multiple sizes); fall back to .png
     ico_path = _resource(os.path.join("assets", "icon.ico"))
@@ -75,15 +150,21 @@ def main():
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
+    _splash_msg(splash, "Loading synthesis engine...")
+    from core.synthesis import _patch_synthpop
+    _patch_synthpop()
+
+    _splash_msg(splash, "Loading interface...")
     from ui.style import APP_QSS
     app.setStyleSheet(APP_QSS)
 
     from ui.main_window import MainWindow
     window = MainWindow()
-    window.show()
 
-    # Push icon directly to the Win32 window handle — setWindowIcon alone
-    # doesn't always update the taskbar button when running under Python.
+    # splash.finish() waits for the main window to appear before closing
+    window.show()
+    splash.finish(window)
+
     if sys.platform == "win32" and os.path.exists(ico_path):
         _set_win32_icon(int(window.winId()), ico_path)
 
