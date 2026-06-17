@@ -143,25 +143,32 @@ def _render_pdf_html(report: dict) -> str:
 
 
 def export_pdf(report: dict, path: str) -> None:
-    """Write the report to a PDF file using Qt's built-in PDF printer."""
-    from PySide6.QtCore import QMarginsF
-    from PySide6.QtGui import QPageLayout, QPageSize, QTextDocument
-    from PySide6.QtPrintSupport import QPrinter
+    """Write the report to a PDF file using QPdfWriter + QTextDocument.
+
+    QPrinter.HighResolution (~1200 DPI) makes QTextDocument lay out text at
+    physical printer scale, producing invisibly-small characters. QPdfWriter
+    at 96 DPI matches screen resolution so fonts render at readable sizes.
+    """
+    from PySide6.QtCore import QMarginsF, QSizeF
+    from PySide6.QtGui import QPageLayout, QPageSize, QPdfWriter, QTextDocument
 
     html = _render_pdf_html(report)
 
-    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-    printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
-    printer.setOutputFileName(path)
-    printer.setPageLayout(QPageLayout(
+    writer = QPdfWriter(path)
+    writer.setResolution(96)
+    writer.setPageLayout(QPageLayout(
         QPageSize(QPageSize.PageSizeId.A4),
         QPageLayout.Orientation.Portrait,
         QMarginsF(15, 15, 15, 15),
+        QPageLayout.Unit.Millimeter,
     ))
 
     doc = QTextDocument()
     doc.setHtml(html)
-    doc.print_(printer)
+    # Tell QTextDocument the usable page area so it paginates correctly.
+    paint_rect = writer.pageLayout().paintRectPixels(96)
+    doc.setPageSize(QSizeF(paint_rect.size()))
+    doc.print_(writer)
 
 
 # ── Excel ─────────────────────────────────────────────────────────────────────
