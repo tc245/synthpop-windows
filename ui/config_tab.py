@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QThread
 
 from ui.synthesis_worker import SynthesisWorker
-from ui.widgets import CollapsibleBanner
+from ui.widgets import CollapsibleBanner, tooltip_badge, with_tip
 
 _GC_DISTRIBUTIONS = ["beta", "norm", "truncnorm", "uniform"]
 
@@ -71,13 +71,18 @@ class ConfigTab(QWidget):
         self._n_rows.setRange(1, 10_000_000)
         self._n_rows.setValue(1000)
         self._n_rows.setFixedWidth(120)
-        synth_form.addRow("Output rows:", self._n_rows)
+        synth_form.addRow("Output rows:", with_tip(self._n_rows,
+            "<p><b>Output rows</b></p>"
+            "<p>Number of rows in the synthetic dataset. You can request more "
+            "or fewer rows than the original — the model is trained once and "
+            "sampled as many times as needed.</p>"
+        ))
 
         method_widget = QWidget()
         method_widget.setStyleSheet("background: transparent;")
         method_layout = QHBoxLayout(method_widget)
         method_layout.setContentsMargins(0, 0, 0, 0)
-        method_layout.setSpacing(12)
+        method_layout.setSpacing(8)
         self._cart_radio = QRadioButton("CART")
         self._gc_radio = QRadioButton("Gaussian Copula")
         self._cart_radio.setChecked(True)
@@ -85,7 +90,21 @@ class ConfigTab(QWidget):
         self._method_group.addButton(self._cart_radio, 0)
         self._method_group.addButton(self._gc_radio, 1)
         method_layout.addWidget(self._cart_radio)
+        method_layout.addWidget(tooltip_badge(
+            "<p><b>CART</b></p>"
+            "<p>Synthesises each column sequentially using a decision tree "
+            "fitted on all previously synthesised columns. Handles mixed "
+            "numeric and categorical data naturally. Recommended default.</p>"
+        ))
+        method_layout.addSpacing(8)
         method_layout.addWidget(self._gc_radio)
+        method_layout.addWidget(tooltip_badge(
+            "<p><b>Gaussian Copula</b></p>"
+            "<p>Models the joint distribution of numeric variables using a "
+            "multivariate Gaussian copula. Faster on large datasets but "
+            "assumes approximately Gaussian dependency structure. Less suited "
+            "to highly non-linear or mixed data.</p>"
+        ))
         method_layout.addStretch()
         synth_form.addRow("Method:", method_widget)
 
@@ -98,18 +117,40 @@ class ConfigTab(QWidget):
         cart_form.setSpacing(6)
         self._smoothing = QCheckBox("Smoothing")
         self._proper = QCheckBox("Proper synthesis")
-        cart_form.addRow(self._smoothing)
-        cart_form.addRow(self._proper)
+        cart_form.addRow(with_tip(self._smoothing,
+            "<p><b>Smoothing</b></p>"
+            "<p>Adds small random noise drawn from within each leaf node, "
+            "making the synthetic distribution less discretely blocky. "
+            "Useful for continuous numeric variables.</p>",
+            stretch=False,
+        ))
+        cart_form.addRow(with_tip(self._proper,
+            "<p><b>Proper synthesis</b></p>"
+            "<p>Re-fits the CART model on a bootstrap resample before each "
+            "synthesis step, adding model uncertainty. Produces more "
+            "statistically rigorous output at the cost of longer runtime.</p>",
+            stretch=False,
+        ))
         self._minibucket = QSpinBox()
         self._minibucket.setRange(1, 1000)
         self._minibucket.setValue(5)
         self._minibucket.setFixedWidth(80)
-        cart_form.addRow("Minibucket:", self._minibucket)
+        cart_form.addRow("Minibucket:", with_tip(self._minibucket,
+            "<p><b>Minibucket</b></p>"
+            "<p>Minimum observations required in a leaf node before the tree "
+            "stops splitting. Higher values produce simpler models with lower "
+            "disclosure risk. Default 5; increase to 10–25 for higher privacy.</p>"
+        ))
         self._random_state = QSpinBox()
         self._random_state.setRange(0, 99999)
         self._random_state.setValue(42)
         self._random_state.setFixedWidth(80)
-        cart_form.addRow("Random state:", self._random_state)
+        cart_form.addRow("Random state:", with_tip(self._random_state,
+            "<p><b>Random state (seed)</b></p>"
+            "<p>Seed for the random number generator. Using the same seed "
+            "with the same data and settings produces identical output, "
+            "enabling reproducibility.</p>"
+        ))
         synth_form.addRow(self._cart_box)
 
         # GC options (nested group)
@@ -123,23 +164,56 @@ class ConfigTab(QWidget):
         self._enforce_min_max.setChecked(True)
         self._enforce_rounding = QCheckBox("Enforce rounding")
         self._enforce_rounding.setChecked(True)
-        gc_form.addRow(self._enforce_min_max)
-        gc_form.addRow(self._enforce_rounding)
+        gc_form.addRow(with_tip(self._enforce_min_max,
+            "<p><b>Enforce min/max values</b></p>"
+            "<p>Clips synthetic values to the observed minimum and maximum "
+            "of each column, preventing impossible values. Recommended.</p>",
+            stretch=False,
+        ))
+        gc_form.addRow(with_tip(self._enforce_rounding,
+            "<p><b>Enforce rounding</b></p>"
+            "<p>Rounds synthetic values to match the decimal precision of "
+            "the original column, maintaining data type consistency.</p>",
+            stretch=False,
+        ))
         self._default_dist = QComboBox()
         self._default_dist.addItems(_GC_DISTRIBUTIONS)
-        gc_form.addRow("Default distribution:", self._default_dist)
+        gc_form.addRow("Default distribution:", with_tip(self._default_dist,
+            "<p><b>Default distribution</b></p>"
+            "<p>Marginal distribution fitted to each numeric column:</p>"
+            "<ul>"
+            "<li><b>beta</b> — bounded, rescaled to 0–1 (recommended)</li>"
+            "<li><b>norm</b> — standard Gaussian</li>"
+            "<li><b>truncnorm</b> — Gaussian clipped at observed min/max</li>"
+            "<li><b>uniform</b> — flat between min and max</li>"
+            "</ul>"
+        ))
         self._gc_box.setVisible(False)
         synth_form.addRow(self._gc_box)
 
         self._skip_imputation = QCheckBox("Skip missing-data imputation")
         self._skip_imputation.setChecked(True)
-        synth_form.addRow(self._skip_imputation)
+        synth_form.addRow(with_tip(self._skip_imputation,
+            "<p><b>Skip missing-data imputation</b></p>"
+            "<p>When checked (recommended), missing values are left as-is "
+            "and handled natively during model fitting. When unchecked, a "
+            "separate imputation step runs first, which can improve fidelity "
+            "but adds time and may introduce artefacts.</p>",
+            stretch=False,
+        ))
 
         self._max_train_rows = QSpinBox()
         self._max_train_rows.setRange(100, 10_000_000)
         self._max_train_rows.setValue(20000)
         self._max_train_rows.setFixedWidth(120)
-        synth_form.addRow("Max training rows:", self._max_train_rows)
+        synth_form.addRow("Max training rows:", with_tip(self._max_train_rows,
+            "<p><b>Max training rows</b></p>"
+            "<p>Maximum rows used to <i>train</i> the model. If the dataset "
+            "is larger, a random subsample is drawn for fitting. The output "
+            "can still contain as many rows as specified above. Reducing this "
+            "value speeds up synthesis on large datasets. Values above 50,000 "
+            "may take a very long time.</p>"
+        ))
 
         self._mtr_warning = QLabel(
             "Warning: training on >50,000 rows may take a very long time."
@@ -160,6 +234,13 @@ class ConfigTab(QWidget):
         self._deselect_all_btn.setFixedWidth(90)
         sel_btns.addWidget(self._select_all_btn)
         sel_btns.addWidget(self._deselect_all_btn)
+        sel_btns.addWidget(tooltip_badge(
+            "<p><b>Column selection</b></p>"
+            "<p>Tick columns to include in the synthetic dataset. "
+            "Columns marked <i>ignore</i> on the Load Data tab are "
+            "excluded automatically. Untick columns you want to omit "
+            "even if they were classified as categorical or numeric.</p>"
+        ))
         sel_btns.addStretch()
         col_layout.addLayout(sel_btns)
         self._col_list = QListWidget()
@@ -230,114 +311,6 @@ class ConfigTab(QWidget):
         btn_row.addWidget(self._generate_btn)
         btn_row.addWidget(self._cancel_btn)
         root.addLayout(btn_row)
-
-        # ── Tooltips ─────────────────────────────────────────────────────────
-        self._n_rows.setToolTip(
-            "<p><b>Output rows</b></p>"
-            "<p>Number of rows in the synthetic dataset. Defaults to the "
-            "same number as the original data. You can request more or fewer "
-            "rows than the original — the model is trained once and sampled "
-            "as many times as needed.</p>"
-        )
-        self._cart_radio.setToolTip(
-            "<p><b>CART (Classification and Regression Trees)</b></p>"
-            "<p>Synthesises each column sequentially using a decision tree "
-            "fitted on all previously synthesised columns. Handles mixed "
-            "numeric and categorical data naturally and preserves complex "
-            "non-linear relationships. Recommended default.</p>"
-        )
-        self._gc_radio.setToolTip(
-            "<p><b>Gaussian Copula</b></p>"
-            "<p>Models the joint distribution of numeric variables using a "
-            "multivariate Gaussian copula, then fits separate marginal "
-            "distributions per column. Faster than CART on large datasets "
-            "but assumes the dependency structure is approximately Gaussian. "
-            "Less suited to highly non-linear or mixed data.</p>"
-        )
-        self._smoothing.setToolTip(
-            "<p><b>Smoothing</b></p>"
-            "<p>Adds small random noise drawn from within each leaf node of "
-            "the CART tree, making the synthetic distribution less discretely "
-            "blocky. Useful for continuous numeric variables where you want "
-            "a smoother output distribution.</p>"
-        )
-        self._proper.setToolTip(
-            "<p><b>Proper synthesis</b></p>"
-            "<p>Re-fits the CART model on a bootstrap resample of the data "
-            "before each synthesis step, adding model uncertainty to the "
-            "synthetic values. Produces more statistically rigorous "
-            "inference-safe synthetic data at the cost of slightly lower "
-            "fidelity and longer runtime.</p>"
-        )
-        self._minibucket.setToolTip(
-            "<p><b>Minibucket</b></p>"
-            "<p>Minimum number of observations required in a leaf node "
-            "before the CART tree stops splitting. Higher values produce "
-            "simpler, smoother models that are less likely to memorise "
-            "individual records. Lower values capture finer detail but "
-            "increase disclosure risk. Default 5; increase to 10–25 for "
-            "higher privacy assurance.</p>"
-        )
-        self._random_state.setToolTip(
-            "<p><b>Random state (seed)</b></p>"
-            "<p>Seed for the random number generator. Using the same seed "
-            "with the same data and settings produces identical synthetic "
-            "data, enabling reproducibility. Change the value to get a "
-            "different synthetic sample from the same model.</p>"
-        )
-        self._enforce_min_max.setToolTip(
-            "<p><b>Enforce min/max values</b></p>"
-            "<p>Clips synthetic values to the observed minimum and maximum "
-            "of each column. Prevents the Gaussian copula from generating "
-            "impossible values such as negative ages or incomes above the "
-            "observed ceiling. Recommended.</p>"
-        )
-        self._enforce_rounding.setToolTip(
-            "<p><b>Enforce rounding</b></p>"
-            "<p>Rounds synthetic values to match the decimal precision of "
-            "the original column. For example, if all original values are "
-            "whole numbers, synthetic values will also be whole numbers. "
-            "Helps maintain data type consistency.</p>"
-        )
-        self._default_dist.setToolTip(
-            "<p><b>Default distribution</b></p>"
-            "<p>Marginal distribution fitted to each numeric column before "
-            "the copula transformation is applied:</p>"
-            "<ul>"
-            "<li><b>norm</b> — standard normal (Gaussian)</li>"
-            "<li><b>beta</b> — bounded distribution rescaled to 0–1 "
-            "(recommended default)</li>"
-            "<li><b>truncnorm</b> — normal distribution clipped at the "
-            "observed min/max</li>"
-            "<li><b>uniform</b> — flat distribution between min and max</li>"
-            "</ul>"
-        )
-        self._skip_imputation.setToolTip(
-            "<p><b>Skip missing-data imputation</b></p>"
-            "<p>When checked (recommended), missing values (NaN) are left "
-            "as-is and handled natively by synthpop during model fitting. "
-            "When unchecked, a separate imputation step fills in missing "
-            "values before fitting, which can sometimes improve fidelity "
-            "but adds processing time and may introduce artefacts.</p>"
-        )
-        self._max_train_rows.setToolTip(
-            "<p><b>Max training rows</b></p>"
-            "<p>Maximum number of rows used to <i>train</i> the synthesis "
-            "model. If the dataset is larger, a random subsample is drawn "
-            "for fitting. The output can still contain as many rows as "
-            "specified in <i>Output rows</i>. Reducing this value "
-            "dramatically speeds up synthesis on large datasets with "
-            "minimal quality loss. Values above 50,000 may take a very "
-            "long time.</p>"
-        )
-        self._col_list.setToolTip(
-            "<p><b>Column selection</b></p>"
-            "<p>Tick columns to include in the synthetic dataset. "
-            "Columns marked <i>ignore</i> on the Load Data tab are "
-            "excluded automatically and do not appear here. Untick "
-            "columns you want to omit even if they were classified as "
-            "categorical or numeric.</p>"
-        )
 
         # ── Signal wiring ─────────────────────────────────────────────────────
         self._cart_radio.toggled.connect(self._on_method_changed)

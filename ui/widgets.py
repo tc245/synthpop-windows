@@ -1,6 +1,36 @@
 """Shared reusable widgets."""
 
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QWidget
+
+
+def tooltip_badge(text: str) -> QLabel:
+    """Small purple ? circle that shows a rich tooltip on hover."""
+    badge = QLabel("?")
+    badge.setFixedSize(16, 16)
+    badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    badge.setToolTip(text)
+    badge.setCursor(Qt.CursorShape.PointingHandCursor)
+    badge.setStyleSheet(
+        "QLabel { background:#9063CD; color:white; border-radius:8px;"
+        " font-size:9px; font-weight:bold; }"
+        "QLabel:hover { background:#5a3a8e; }"
+    )
+    return badge
+
+
+def with_tip(widget: QWidget, text: str, stretch: bool = True) -> QWidget:
+    """Wrap *widget* with a tooltip badge immediately to its right."""
+    container = QWidget()
+    container.setStyleSheet("background:transparent;")
+    h = QHBoxLayout(container)
+    h.setContentsMargins(0, 0, 0, 0)
+    h.setSpacing(6)
+    h.addWidget(widget)
+    h.addWidget(tooltip_badge(text))
+    if stretch:
+        h.addStretch()
+    return container
 
 
 class CollapsibleBanner(QFrame):
