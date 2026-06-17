@@ -76,6 +76,14 @@ class ReportTab(QWidget):
         self._save_csv_btn.setProperty("role", "export")
         self._save_csv_btn.setEnabled(False)
         self._save_csv_btn.clicked.connect(self._save_csv)
+        self._save_pdf_btn = QPushButton("Save Report as PDF…")
+        self._save_pdf_btn.setProperty("role", "export")
+        self._save_pdf_btn.setEnabled(False)
+        self._save_pdf_btn.clicked.connect(self._save_pdf)
+        self._save_excel_btn = QPushButton("Save Report as Excel…")
+        self._save_excel_btn.setProperty("role", "export")
+        self._save_excel_btn.setEnabled(False)
+        self._save_excel_btn.clicked.connect(self._save_excel)
         self._save_html_btn = QPushButton("Save Report as HTML…")
         self._save_html_btn.setProperty("role", "export")
         self._save_html_btn.setEnabled(False)
@@ -83,6 +91,8 @@ class ReportTab(QWidget):
         top.addWidget(self._status_label)
         top.addStretch()
         top.addWidget(self._save_csv_btn)
+        top.addWidget(self._save_pdf_btn)
+        top.addWidget(self._save_excel_btn)
         top.addWidget(self._save_html_btn)
         root.addLayout(top)
 
@@ -155,6 +165,8 @@ class ReportTab(QWidget):
             f"{report['n_synth']:,} synthetic rows",
         )
         self._render_to_browser()
+        self._save_pdf_btn.setEnabled(True)
+        self._save_excel_btn.setEnabled(True)
         self._save_html_btn.setEnabled(True)
 
     def _render_to_browser(self):
@@ -240,11 +252,50 @@ class ReportTab(QWidget):
             except Exception as exc:
                 QMessageBox.critical(self, "Save error", str(exc))
 
+    def _save_pdf(self):
+        if not self._html:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Report as PDF", "synth_report.pdf", "PDF files (*.pdf)"
+        )
+        if not path:
+            return
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            from core.export import export_pdf
+            export_pdf(self._html, path)
+        except Exception as exc:
+            QMessageBox.critical(self, "PDF export error", str(exc))
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def _save_excel(self):
+        if not self._report:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Report as Excel",
+            "synth_report.xlsx", "Excel files (*.xlsx)"
+        )
+        if not path:
+            return
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            from core.export import export_excel
+            export_excel(self._report, path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Excel export error", str(exc))
+        finally:
+            QApplication.restoreOverrideCursor()
+
     def _save_html(self):
         if not self._html:
             return
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save Report", "synth_report.html", "HTML files (*.html)"
+            self, "Save Report as HTML", "synth_report.html", "HTML files (*.html)"
         )
         if path:
             try:

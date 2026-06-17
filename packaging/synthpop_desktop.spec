@@ -14,16 +14,19 @@ hidden = (
     collect_submodules("scipy")
     + collect_submodules("sklearn")
     + collect_submodules("synthpop")
+    + collect_submodules("openpyxl")
+    + collect_submodules("weasyprint")
     + [
         "matplotlib.backends.backend_agg",
         "pandas._libs.tslibs.base",
     ]
 )
 
-# Collect data files (matplotlib fonts, scipy data, etc.)
+# Collect data files (matplotlib fonts, scipy data, weasyprint CSS, etc.)
 datas = (
     collect_data_files("matplotlib")
     + collect_data_files("scipy")
+    + collect_data_files("weasyprint")
     + [(str(ROOT / "assets" / "icon.png"), "assets")]
     + [(str(ROOT / "assets" / "icon.ico"), "assets")]
 )
