@@ -151,12 +151,14 @@ def build_synth_report(orig_df, synth_df, variable_types):
             diff = (real_corr - synth_corr).abs()
 
             n = len(heatmap_vars)
-            cell = max(0.5, min(1.0, 8.0 / n))
-            fig_w = max(12, n * cell * 3)
-            fig_h = max(3, n * cell)
+            cell = max(0.7, min(1.4, 10.0 / n))
+            fig_w = max(18, n * cell * 3)
+            fig_h = max(5, n * cell + 1)
             fig, axes = plt.subplots(1, 3, figsize=(fig_w, fig_h), constrained_layout=True)
 
-            annot = n <= 15
+            annot = n <= 12
+            fs_tick = max(6, min(10, 80 // n))
+            fs_annot = max(5, min(8, 60 // n))
             for ax, matrix, title, cmap in zip(
                 axes,
                 [real_corr, synth_corr, diff],
@@ -172,20 +174,20 @@ def build_synth_report(orig_df, synth_df, variable_types):
                 fig.colorbar(im, ax=ax, shrink=0.8)
                 ax.set_xticks(range(n))
                 ax.set_yticks(range(n))
-                ax.set_xticklabels(matrix.columns, rotation=45, ha="right", fontsize=7)
-                ax.set_yticklabels(matrix.index, fontsize=7)
-                ax.set_title(title, fontsize=9)
+                ax.set_xticklabels(matrix.columns, rotation=45, ha="right", fontsize=fs_tick)
+                ax.set_yticklabels(matrix.index, fontsize=fs_tick)
+                ax.set_title(title, fontsize=11)
                 if annot:
                     for i in range(n):
                         for j in range(n):
                             ax.text(
                                 j, i, f"{matrix.values[i, j]:.2f}",
-                                ha="center", va="center", fontsize=6,
+                                ha="center", va="center", fontsize=fs_annot,
                                 color="white" if abs(matrix.values[i, j]) > 0.6 else "black",
                             )
 
             buf = io.BytesIO()
-            fig.savefig(buf, format="png", dpi=72, bbox_inches="tight")
+            fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
             plt.close(fig)
             buf.seek(0)
             report["corr_heatmap_b64"] = base64.b64encode(buf.read()).decode("ascii")
@@ -217,125 +219,140 @@ def render_report_html(report: dict) -> str:
     parts = [
         "<html><head><style>",
         "body{font-family:Arial,sans-serif;font-size:12px;margin:8px;}",
-        "h2{font-size:14px;color:#333;border-bottom:1px solid #ccc;padding-bottom:3px;margin-top:14px;}",
-        "h3{font-size:12px;color:#555;margin-top:10px;}",
-        "table{border-collapse:collapse;margin-bottom:10px;font-size:11px;}",
-        "th{background:#f0f0f0;padding:3px 7px;border:1px solid #ccc;text-align:left;}",
-        "td{padding:3px 7px;border:1px solid #ccc;}",
+        "h2{font-size:13px;color:#333;border-bottom:1px solid #ccc;"
+        "padding-bottom:3px;margin-top:12px;margin-bottom:4px;}",
+        "h3{font-size:11px;color:#555;margin-top:8px;margin-bottom:2px;}",
+        "table{border-collapse:collapse;margin-bottom:8px;font-size:11px;}",
+        "th{background:#f0f0f0;padding:3px 6px;border:1px solid #ccc;text-align:left;}",
+        "td{padding:3px 6px;border:1px solid #ccc;}",
         ".muted{color:#777;font-size:11px;}",
         ".warn{color:orange;}",
-        ".notice{background:#fff3cd;border:1px solid #ffc107;padding:6px 10px;"
-        "border-radius:4px;margin-bottom:10px;font-size:11px;}",
+        ".col-divider{border-right:1px solid #e0d8f0;padding-right:12px;}",
+        ".col-right{padding-left:12px;}",
         "</style></head><body>",
     ]
 
-    # Privacy notice
     parts.append(
-        "<div class='notice'><strong>Privacy notice:</strong> The synthetic dataset has been "
-        "generated to preserve statistical properties of the original data while reducing "
-        "re-identification risk. It should not be treated as real data or used to make "
-        "inferences about specific individuals.</div>"
-    )
-
-    parts.append(
-        f"<p class='muted'>Original: <strong>{report['n_orig']:,}</strong> rows &nbsp;·&nbsp; "
+        f"<p class='muted'>Original: <strong>{report['n_orig']:,}</strong> rows"
+        f" &nbsp;·&nbsp; "
         f"Synthetic: <strong>{report['n_synth']:,}</strong> rows</p>"
     )
 
-    # Numeric summary
+    # ── Build left column (numeric) ───────────────────────────────────────────
+    left = []
+
     ns = report.get("numeric_summary")
     if ns and ns["rows"]:
-        parts.append("<h2>Numeric summary <span class='muted'>(min/max excluded)</span></h2>")
-        parts.append("<table><thead><tr><th>Statistic</th>")
+        left.append("<h2>Numeric summary <span class='muted'>(min/max excluded)</span></h2>")
+        left.append("<table><thead><tr><th>Stat</th>")
         for col in ns["num_vars"]:
-            parts.append(f"<th colspan='2' align='center'>{col}</th>")
-        parts.append("</tr><tr><th></th>")
+            left.append(f"<th colspan='2' align='center'>{col}</th>")
+        left.append("</tr><tr><th></th>")
         for _ in ns["num_vars"]:
-            parts.append(
+            left.append(
                 "<th class='muted' align='right'>Real</th>"
                 "<th class='muted' align='right'>Synth</th>"
             )
-        parts.append("</tr></thead><tbody>")
+        left.append("</tr></thead><tbody>")
         for row in ns["rows"]:
-            parts.append(f"<tr><td><code>{row['stat']}</code></td>")
+            left.append(f"<tr><td><code>{row['stat']}</code></td>")
             for col in ns["num_vars"]:
-                parts.append(
+                left.append(
                     f"<td align='right'>{_val(row.get(col+'__real'))}</td>"
                     f"<td align='right'>{_val(row.get(col+'__synth'))}</td>"
                 )
-            parts.append("</tr>")
-        parts.append("</tbody></table>")
+            left.append("</tr>")
+        left.append("</tbody></table>")
 
-    # KS tests
     if report.get("ks_tests"):
-        parts.append("<h2>Kolmogorov–Smirnov test — numeric variables</h2>")
-        parts.append(
+        left.append("<h2>Kolmogorov–Smirnov tests</h2>")
+        left.append(
             "<table><thead><tr>"
-            "<th>Variable</th><th align='right'>KS statistic</th>"
-            "<th align='right'>p-value</th><th align='center'>Pass (p≥0.05)</th>"
+            "<th>Variable</th><th align='right'>KS</th>"
+            "<th align='right'>p-value</th><th align='center'>Pass</th>"
             "</tr></thead><tbody>"
         )
         for row in report["ks_tests"]:
-            parts.append(
+            left.append(
                 f"<tr><td><code>{row['variable']}</code></td>"
                 f"<td align='right'>{_val(row['statistic'])}</td>"
                 f"<td align='right'>{_val(row['pvalue'])}</td>"
                 f"{_pass_cell(row['pass'])}</tr>"
             )
-        parts.append("</tbody></table>")
+        left.append("</tbody></table>")
 
-    # Chi-squared tests
+    # ── Build right column (categorical) ──────────────────────────────────────
+    right = []
+
     if report.get("chi2_tests"):
-        parts.append("<h2>Chi-squared test — categorical variables</h2>")
-        parts.append(
+        right.append("<h2>Chi-squared tests</h2>")
+        right.append(
             "<table><thead><tr>"
-            "<th>Variable</th><th align='right'>χ² statistic</th>"
-            "<th align='right'>p-value</th><th align='center'>Pass (p≥0.05)</th>"
+            "<th>Variable</th><th align='right'>χ²</th>"
+            "<th align='right'>p-value</th><th align='center'>Pass</th>"
             "</tr></thead><tbody>"
         )
         for row in report["chi2_tests"]:
-            parts.append(
+            right.append(
                 f"<tr><td><code>{row['variable']}</code></td>"
                 f"<td align='right'>{_val(row['statistic'])}</td>"
                 f"<td align='right'>{_val(row['pvalue'])}</td>"
                 f"{_pass_cell(row['pass'])}</tr>"
             )
-        parts.append("</tbody></table>")
+        right.append("</tbody></table>")
 
-    # Categorical frequency
     if report.get("cat_freq"):
-        parts.append("<h2>Categorical frequency comparison</h2>")
+        right.append("<h2>Categorical frequency comparison</h2>")
         for col, cats in report["cat_freq"].items():
-            parts.append(
-                f"<h3><code>{col}</code> "
-                f"<span class='muted'>({len(cats)} categories)</span></h3>"
+            right.append(
+                f"<h3><code>{col}</code>"
+                f" <span class='muted'>({len(cats)} categories)</span></h3>"
             )
-            parts.append(
+            right.append(
                 "<table><thead><tr>"
                 "<th>Category</th><th align='right'>Real %</th>"
                 "<th align='right'>Synth %</th><th align='right'>Diff</th>"
                 "</tr></thead><tbody>"
             )
-            show = cats[:50]
-            for c in show:
+            for c in cats[:50]:
                 real_pct = c["real_pct"] or 0.0
                 synth_pct = c["synth_pct"] or 0.0
                 diff = abs(real_pct - synth_pct)
                 warn = " class='warn'" if diff > 5 else ""
-                parts.append(
+                right.append(
                     f"<tr><td>{c['category']}</td>"
                     f"<td align='right'>{real_pct}</td>"
                     f"<td align='right'>{synth_pct}</td>"
                     f"<td align='right'{warn}>{diff:.1f}</td></tr>"
                 )
             if len(cats) > 50:
-                parts.append(
+                right.append(
                     f"<tr><td colspan='4' class='muted'>"
-                    f"… {len(cats) - 50} more categories not shown</td></tr>"
+                    f"… {len(cats) - 50} more not shown</td></tr>"
                 )
-            parts.append("</tbody></table>")
+            right.append("</tbody></table>")
 
-    # Correlation heatmap
+    # ── Layout: two columns when both sides have content, else single column ──
+    if left and right:
+        parts.append(
+            "<table width='100%' cellspacing='0' cellpadding='0'><tr>"
+            "<td valign='top' width='50%' class='col-divider'>"
+        )
+        parts.extend(left)
+        parts.append("</td><td valign='top' width='50%' class='col-right'>")
+        parts.extend(right)
+        parts.append("</td></tr></table>")
+    elif left:
+        parts.extend(left)
+    elif right:
+        parts.extend(right)
+    else:
+        parts.append(
+            "<p class='muted'>No numeric or categorical variables found in common "
+            "between the two datasets.</p>"
+        )
+
+    # ── Correlation heatmap (full width below columns) ────────────────────────
     if report.get("corr_heatmap_b64"):
         parts.append("<h2>Correlation structure — real vs synthetic</h2>")
         parts.append(
@@ -351,12 +368,6 @@ def render_report_html(report: dict) -> str:
         parts.append(
             f"<p class='warn'>Correlation heatmap could not be generated: "
             f"{report['corr_heatmap_error']}</p>"
-        )
-
-    if not report.get("num_vars") and not report.get("cat_vars"):
-        parts.append(
-            "<p class='muted'>No numeric or categorical variables found in common "
-            "between the two datasets.</p>"
         )
 
     parts.append("</body></html>")

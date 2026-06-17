@@ -1,6 +1,6 @@
 import base64
 
-from PySide6.QtCore import QByteArray, QThread, Slot
+from PySide6.QtCore import QByteArray, Qt, QThread, Slot
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
@@ -167,7 +167,18 @@ class ReportTab(QWidget):
             cursor = self._browser.document().find(_HEATMAP_MARKER)
             if not cursor.isNull():
                 cursor.removeSelectedText()
-                cursor.insertImage(heatmap_img)
+                vp_w = self._browser.viewport().width() - 30
+                if vp_w > 100 and not heatmap_img.isNull():
+                    scale = vp_w / heatmap_img.width()
+                    display_img = heatmap_img.scaled(
+                        vp_w,
+                        int(heatmap_img.height() * scale),
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                else:
+                    display_img = heatmap_img
+                cursor.insertImage(display_img)
             else:
                 print("[report] heatmap marker not found in document", flush=True)
 
