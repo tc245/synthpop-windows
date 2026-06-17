@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTableWidget, QTableWidgetItem, QComboBox, QGroupBox,
     QScrollArea, QCheckBox, QFileDialog, QMessageBox,
-    QSizePolicy, QAbstractItemView,
+    QSizePolicy, QAbstractItemView, QSplitter,
 )
 
 from core.data_io import load_csv, default_variable_types, detect_numeric_sentinels, column_cardinality
@@ -82,7 +82,13 @@ class DataTab(QWidget):
         info_bar.addStretch()
         cl.addLayout(info_bar)
 
-        # Column type table
+        # Two-column splitter: variable types table (left) | sentinel codes (right)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # ── Left: column type table ───────────────────────────────────────────
+        table_box = QGroupBox("Variable types")
+        table_layout = QVBoxLayout(table_box)
+        table_layout.setContentsMargins(6, 6, 6, 6)
         self._table = QTableWidget(0, 4)
         self._table.setHorizontalHeaderLabels(
             ["Column", "Pandas dtype", "Unique values", "Variable type"]
@@ -97,15 +103,16 @@ class DataTab(QWidget):
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
-        cl.addWidget(self._table, stretch=3)
+        table_layout.addWidget(self._table)
+        self._splitter.addWidget(table_box)
 
-        # Sentinel section
-        self._sentinel_box = QGroupBox("Potential missing-value sentinel codes detected")
+        # ── Right: sentinel codes ─────────────────────────────────────────────
+        self._sentinel_box = QGroupBox("Missing-value sentinel codes")
         self._sentinel_box.setVisible(False)
         sent_layout = QVBoxLayout(self._sentinel_box)
         hint = QLabel(
             "Check codes that should be treated as missing (NaN). "
-            "Pre-checked codes are known sentinel patterns (e.g. -99, -999)."
+            "Pre-checked codes are known sentinel patterns (e.g. −99, −999)."
         )
         hint.setStyleSheet("color: #5a3a8e; font-size: 11px;")
         hint.setWordWrap(True)
@@ -113,13 +120,16 @@ class DataTab(QWidget):
 
         self._sentinel_scroll = QScrollArea()
         self._sentinel_scroll.setWidgetResizable(True)
-        self._sentinel_scroll.setFixedHeight(140)
         self._sentinel_inner = QWidget()
         self._sentinel_inner_layout = QVBoxLayout(self._sentinel_inner)
         self._sentinel_inner_layout.setSpacing(2)
         self._sentinel_scroll.setWidget(self._sentinel_inner)
         sent_layout.addWidget(self._sentinel_scroll)
-        cl.addWidget(self._sentinel_box)
+        self._splitter.addWidget(self._sentinel_box)
+
+        self._splitter.setSizes([620, 300])
+        self._splitter.setCollapsible(0, False)
+        cl.addWidget(self._splitter, stretch=1)
 
         # Confirm button
         self._confirm_btn = QPushButton("Apply sentinels & confirm variable types  →")
@@ -263,7 +273,11 @@ class DataTab(QWidget):
         self._sentinels = detect_numeric_sentinels(df)
         if not self._sentinels:
             self._sentinel_box.setVisible(False)
+            self._splitter.setSizes([1, 0])
             return
+
+        self._sentinel_box.setVisible(True)
+        self._splitter.setSizes([620, 300])
 
         for col, suspects in self._sentinels.items():
             for val, freq, suggested in suspects:
@@ -274,7 +288,6 @@ class DataTab(QWidget):
                 self._sentinel_checks[(col, val)] = cb
 
         self._sentinel_inner_layout.addStretch()
-        self._sentinel_box.setVisible(True)
 
     def _confirm(self):
         if self._df is None:
