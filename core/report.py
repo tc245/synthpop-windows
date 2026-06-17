@@ -335,7 +335,20 @@ def render_report_html(report: dict) -> str:
     # ── Layout: two columns when both sides have content, else single column ──
     if left and right:
         parts.append(
-            "<table width='100%' cellspacing='0' cellpadding='0'><tr>"
+            "<table width='100%' cellspacing='0' cellpadding='0'>"
+            "<tr>"
+            "<td width='50%' class='col-divider' style='padding-bottom:4px;'>"
+            "<h1 style='font-size:14px;color:#333;margin:0 0 6px 0;"
+            "border-bottom:2px solid #9063CD;padding-bottom:4px;'>"
+            "Numeric Variable Summary</h1>"
+            "</td>"
+            "<td width='50%' class='col-right' style='padding-bottom:4px;'>"
+            "<h1 style='font-size:14px;color:#333;margin:0 0 6px 0;"
+            "border-bottom:2px solid #9063CD;padding-bottom:4px;'>"
+            "Categorical Variable Summary</h1>"
+            "</td>"
+            "</tr>"
+            "<tr>"
             "<td valign='top' width='50%' class='col-divider'>"
         )
         parts.extend(left)
