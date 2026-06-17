@@ -12,9 +12,12 @@ class CancelledError(Exception):
 def _patch_synthpop():
     """Fix synthpop's DataProcessor to always use LabelEncoder (never OneHotEncoder).
 
-    Bug: _preprocess() switches to OHE for categorical columns with >=10 unique values,
-    then KeyErrors in postprocess because original column names are gone.
-    Fix: always use LabelEncoder, converting NaN to '__NA__' first.
+    Bug: preprocess() / _preprocess() may switch to OHE for categorical columns
+    with >=10 unique values, then KeyErrors in postprocess because original column
+    names are gone.
+    Fix: patch BOTH the public and private preprocess method names so the fix
+    applies regardless of how synthpop's internal call chain is structured.
+    Always use LabelEncoder, converting NaN to '__NA__' first.
     """
     try:
         from synthpop.processor.data_processor import DataProcessor
@@ -22,7 +25,18 @@ def _patch_synthpop():
 
         def _fixed_preprocess(self, data: pd.DataFrame) -> pd.DataFrame:
             data = data.copy()
+            # Defensive initialisation — some synthpop versions set these in the
+            # original preprocess() before calling _preprocess(); patching the
+            # public method directly means __init__ may be the only prior call.
+            if not hasattr(self, "original_columns") or self.original_columns is None:
+                self.original_columns = list(data.columns)
+            if not hasattr(self, "encoders") or self.encoders is None:
+                self.encoders = {}
+            if not hasattr(self, "scalers") or self.scalers is None:
+                self.scalers = {}
             for col, dtype in self.metadata.items():
+                if col not in data.columns:
+                    continue
                 if dtype == "categorical":
                     series = data[col].astype(object).fillna("__NA__").astype(str)
                     encoder = LabelEncoder()
@@ -79,6 +93,9 @@ def _patch_synthpop():
             out_cols = [c for c in self.original_columns if c in data.columns]
             return data[out_cols]
 
+        # Patch both the public and private names — synthpop versions differ in
+        # whether preprocess() delegates to _preprocess() or contains the logic itself.
+        DataProcessor.preprocess = _fixed_preprocess
         DataProcessor._preprocess = _fixed_preprocess
         DataProcessor.postprocess = _fixed_postprocess
     except Exception:
@@ -105,6 +122,60 @@ def _sanitise_for_synthesis(df):
     if drop:
         df = df.drop(columns=drop)
     return df, drop
+
+
+def _recover_cat_labels(synth_df: pd.DataFrame, orig_df: pd.DataFrame, variable_types: dict) -> pd.DataFrame:
+    """Belt-and-suspenders: ensure categorical columns have the correct original labels.
+
+    If synthpop's DataProcessor failed to inverse_transform (e.g. because the public
+    preprocess() doesn't call _preprocess() so our patch was never applied), the
+    synthetic column still holds numeric LabelEncoder codes.  This function detects
+    that situation and remaps codes → original labels using the same alphabetical sort
+    that LabelEncoder.fit() uses on the string-cast values.
+    """
+    synth_df = synth_df.copy()
+    for col, vtype in (variable_types or {}).items():
+        if vtype != "categorical" or col not in orig_df.columns or col not in synth_df.columns:
+            continue
+
+        # Reconstruct the label list in the same order LabelEncoder.fit() would use:
+        # sort the string representations of the non-null unique values, then append
+        # "__NA__" (also sorted in) if the column had any nulls.
+        orig_non_null = orig_df[col].dropna()
+        expected = sorted(orig_non_null.astype(str).unique())
+        if orig_df[col].isna().any():
+            expected = sorted(expected + ["__NA__"])
+
+        if not expected:
+            continue
+
+        # Check whether the synthetic column already contains correct string labels.
+        synth_vals = synth_df[col].dropna()
+        synth_str_set = set(synth_vals.astype(str))
+        if synth_str_set.issubset(set(expected)):
+            # Labels are already correct; just convert any lingering __NA__ sentinel.
+            if "__NA__" in synth_str_set:
+                synth_df[col] = synth_df[col].replace("__NA__", np.nan)
+            continue
+
+        # The synthetic column appears to contain numeric codes — try to remap.
+        codes = pd.to_numeric(synth_df[col], errors="coerce")
+        if codes.isna().all():
+            continue  # Cannot interpret as codes; leave unchanged.
+
+        n = len(expected)
+        null_mask = codes.isna()
+        int_codes = codes.round().clip(0, n - 1).fillna(0).astype(int)
+        decoded = pd.Series(
+            [expected[c] for c in int_codes],
+            index=synth_df.index,
+            dtype=object,
+        )
+        decoded = decoded.replace("__NA__", np.nan)
+        decoded[null_mask] = np.nan
+        synth_df[col] = decoded
+
+    return synth_df
 
 
 def _apply_variable_types(metadata: dict, variable_types: dict) -> dict:
@@ -247,6 +318,13 @@ def run_synthesis(
 
     _cb(85, "Step 5 of 5 — Postprocessing, removing exact duplicates of real rows…")
     synthetic_df = processor.postprocess(synthetic_processed)
+
+    # Guarantee correct string labels for categorical columns.  If synthpop's
+    # DataProcessor.preprocess() didn't call our patched _preprocess() (e.g. because
+    # it contains its own inline logic), the inverse_transform step was never applied
+    # and the column still holds LabelEncoder integer codes.
+    synthetic_df = _recover_cat_labels(synthetic_df, df, variable_types)
+
     common_cols = [c for c in df.columns if c in synthetic_df.columns]
 
     original_hashes = set(

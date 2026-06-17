@@ -91,8 +91,8 @@ def build_synth_report(orig_df, synth_df, variable_types):
         report["numeric_summary"] = {"rows": rows, "num_vars": num_vars}
 
     for col in cat_vars:
-        orig_freq = _norm_series(orig_df[col]).value_counts(normalize=True).mul(100).round(1)
-        synth_freq = _norm_series(synth_df[col]).value_counts(normalize=True).mul(100).round(1)
+        orig_freq = _norm_series(orig_df[col].dropna()).value_counts(normalize=True).mul(100).round(1)
+        synth_freq = _norm_series(synth_df[col].dropna()).value_counts(normalize=True).mul(100).round(1)
         all_cats = sorted(set(orig_freq.index) | set(synth_freq.index))
         report["cat_freq"][col] = [
             {
