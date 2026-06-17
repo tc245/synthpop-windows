@@ -12,11 +12,7 @@ def _resource(relative: str) -> str:
 
 
 def _set_windows_appid():
-    """Tell Windows this is a distinct app so it uses our icon in the taskbar.
-
-    Without this, Windows groups the window under the Python interpreter and
-    shows Python's icon regardless of setWindowIcon().
-    """
+    """Tell Windows this is a distinct app, not the Python interpreter."""
     if sys.platform == "win32":
         try:
             import ctypes
@@ -25,6 +21,28 @@ def _set_windows_appid():
             )
         except Exception:
             pass
+
+
+def _set_win32_icon(hwnd, ico_path: str):
+    """Send WM_SETICON directly to the window handle for reliable taskbar icon."""
+    try:
+        import ctypes
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE = 0x00000010
+        LR_DEFAULTSIZE = 0x00000040
+        WM_SETICON = 0x0080
+        ICON_SMALL = 0
+        ICON_BIG = 1
+
+        hicon = ctypes.windll.user32.LoadImageW(
+            None, ico_path, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE
+        )
+        if hicon:
+            send = ctypes.windll.user32.SendMessageW
+            send(hwnd, WM_SETICON, ICON_SMALL, hicon)
+            send(hwnd, WM_SETICON, ICON_BIG, hicon)
+    except Exception:
+        pass
 
 
 def main():
@@ -50,6 +68,12 @@ def main():
     from ui.main_window import MainWindow
     window = MainWindow()
     window.show()
+
+    # Push icon directly to the Win32 window handle — setWindowIcon alone
+    # doesn't always update the taskbar button when running under Python.
+    if sys.platform == "win32" and os.path.exists(ico_path):
+        _set_win32_icon(int(window.winId()), ico_path)
+
     sys.exit(app.exec())
 
 
