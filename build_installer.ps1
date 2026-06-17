@@ -1,5 +1,5 @@
 # build_installer.ps1
-# Full pipeline: PyInstaller → Inno Setup → .exe installer
+# Full pipeline: PyInstaller -> Inno Setup -> .exe installer
 #
 # Prerequisites:
 #   - Python venv set up:  .\setup.ps1
@@ -11,7 +11,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# ── Step 1: activate venv ──────────────────────────────────────────────────────
+# -- Step 1: activate venv ----------------------------------------------------
 if (-not $env:VIRTUAL_ENV) {
     if (Test-Path ".\.venv\Scripts\Activate.ps1") {
         Write-Host "Activating virtual environment..." -ForegroundColor Cyan
@@ -22,14 +22,14 @@ if (-not $env:VIRTUAL_ENV) {
     }
 }
 
-# ── Step 2: clean ─────────────────────────────────────────────────────────────
+# -- Step 2: clean ------------------------------------------------------------
 Write-Host "Cleaning previous build artefacts..." -ForegroundColor Cyan
 if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
 if (Test-Path "dist")  { Remove-Item -Recurse -Force "dist" }
 
-# ── Step 3: PyInstaller ───────────────────────────────────────────────────────
+# -- Step 3: PyInstaller ------------------------------------------------------
 Write-Host ""
-Write-Host "Step 1/2 — Building app with PyInstaller..." -ForegroundColor Cyan
+Write-Host "Step 1/2 - Building app with PyInstaller..." -ForegroundColor Cyan
 pyinstaller packaging\synthpop_desktop.spec
 if ($LASTEXITCODE -ne 0) {
     Write-Error "PyInstaller failed."
@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "PyInstaller done." -ForegroundColor Green
 
-# ── Step 4: locate Inno Setup ────────────────────────────────────────────────
+# -- Step 4: locate Inno Setup ------------------------------------------------
 $iscc = $null
 $candidates = @(
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
@@ -61,9 +61,9 @@ if (-not $iscc) {
     exit 0
 }
 
-# ── Step 5: Inno Setup ───────────────────────────────────────────────────────
+# -- Step 5: Inno Setup -------------------------------------------------------
 Write-Host ""
-Write-Host "Step 2/2 — Building installer with Inno Setup..." -ForegroundColor Cyan
+Write-Host "Step 2/2 - Building installer with Inno Setup..." -ForegroundColor Cyan
 & $iscc "packaging\installer.iss"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Inno Setup failed."
