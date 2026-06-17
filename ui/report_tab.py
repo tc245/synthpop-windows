@@ -49,6 +49,29 @@ class ReportTab(QWidget):
         )
         root.addWidget(notice)
 
+        instructions = QLabel(
+            "<b>Step 3 — Review and export your results:</b>"
+            "<ol style='margin:4px 0 0 0; padding-left:20px;'>"
+            "<li>Check the <b>Numeric Variable Summary</b> and "
+            "<b>Categorical Variable Summary</b> columns to compare "
+            "statistical properties of the real and synthetic data.</li>"
+            "<li>KS tests (numeric) and Chi-squared tests (categorical) indicate "
+            "whether distributions are statistically similar — a ✓ means the "
+            "synthetic data passes at p≥0.05.</li>"
+            "<li>Use the <b>▼ / ▶</b> arrows on each section header to "
+            "collapse or expand sections.</li>"
+            "<li>Click <b>Save Synthetic CSV</b> to export the data, or "
+            "<b>Save Report as HTML</b> to save the full quality report.</li>"
+            "</ol>"
+        )
+        instructions.setWordWrap(True)
+        instructions.setStyleSheet(
+            "background:#ede8f8; border:1px solid #b89ee0;"
+            " border-left:4px solid #5a3a8e;"
+            " padding:8px 12px; border-radius:4px; font-size:12px; color:#3d2570;"
+        )
+        root.addWidget(instructions)
+
         # Top bar: status badge + export buttons
         top = QHBoxLayout()
         self._status_label = QLabel("")

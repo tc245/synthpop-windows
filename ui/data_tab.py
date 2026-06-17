@@ -45,6 +45,25 @@ class DataTab(QWidget):
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(8)
 
+        # Instruction banner
+        instructions = QLabel(
+            "<b>Step 1 — Review your data before synthesis:</b>"
+            "<ol style='margin:4px 0 0 0; padding-left:20px;'>"
+            "<li>Check each column's <b>Variable type</b> — set it to "
+            "<i>categorical</i>, <i>numeric</i>, or <i>ignore</i> as appropriate.</li>"
+            "<li>If sentinel codes are detected (e.g. −99 meaning "missing"), "
+            "tick the ones that should be treated as missing values (NaN).</li>"
+            "<li>Click <b>Apply sentinels &amp; confirm variable types</b> when ready.</li>"
+            "</ol>"
+        )
+        instructions.setWordWrap(True)
+        instructions.setStyleSheet(
+            "background:#ede8f8; border:1px solid #b89ee0;"
+            " border-left:4px solid #5a3a8e;"
+            " padding:8px 12px; border-radius:4px; font-size:12px; color:#3d2570;"
+        )
+        cl.addWidget(instructions)
+
         # File info bar
         info_bar = QHBoxLayout()
         reload_btn = QPushButton("Open different CSV…")
