@@ -130,7 +130,23 @@ def _render_pdf_html(report: dict) -> str:
     if report.get("corr_heatmap_b64"):
         p.append(f"<h2 style='{_H2}'>Correlation Structure — Real vs Synthetic</h2>")
         heatmap_b64 = report["corr_heatmap_b64"]
-        p.append(f"<img src='data:image/png;base64,{heatmap_b64}' width='100%'/>")
+        # A4 at 96 DPI minus 15 mm margins each side ≈ 681 px usable width.
+        # QTextDocument ignores width='100%' for images; use explicit px dimensions.
+        _PAGE_W_PX = 681
+        try:
+            import base64 as _b64, struct as _struct
+            raw = _b64.b64decode(heatmap_b64)
+            # PNG width/height are at bytes 16-23 of the IHDR chunk
+            img_w, img_h = _struct.unpack(">II", raw[16:24])
+            if img_w > _PAGE_W_PX:
+                img_h = int(img_h * _PAGE_W_PX / img_w)
+                img_w = _PAGE_W_PX
+        except Exception:
+            img_w, img_h = _PAGE_W_PX, 400
+        p.append(
+            f"<img src='data:image/png;base64,{heatmap_b64}'"
+            f" width='{img_w}' height='{img_h}'/>"
+        )
         if report.get("mean_corr_diff") is not None:
             p.append(
                 f"<p style='text-align:center;color:#555;'>"
