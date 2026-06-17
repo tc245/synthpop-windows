@@ -143,6 +143,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Open a CSV file to begin.")
 
         self._data_tab.data_ready.connect(self._on_data_ready)
+        self._data_tab.data_cleared.connect(self._on_data_cleared)
         self._config_tab.synthesis_complete.connect(self._on_synthesis_complete)
 
     # ── Slots ─────────────────────────────────────────────────────────────────
@@ -162,6 +163,16 @@ class MainWindow(QMainWindow):
             f"configure synthesis in the next tab."
         )
         self._tabs.setCurrentIndex(1)
+
+    @Slot()
+    def _on_data_cleared(self):
+        self.source_df = None
+        self.synth_df = None
+        self.variable_types = {}
+        self._tabs.setTabEnabled(1, False)
+        self._tabs.setTabEnabled(2, False)
+        self._tabs.setCurrentIndex(0)
+        self.statusBar().showMessage("Open a CSV file to begin.")
 
     @Slot(object, int)
     def _on_synthesis_complete(self, synth_df, n_dupes: int):

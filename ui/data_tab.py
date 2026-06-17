@@ -18,6 +18,7 @@ class DataTab(QWidget):
     """Load CSV, classify variable types, mark sentinel NA values, then confirm."""
 
     data_ready = Signal(object, object)   # (df: pd.DataFrame, variable_types: dict {col: type})
+    data_cleared = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -49,6 +50,10 @@ class DataTab(QWidget):
         reload_btn = QPushButton("Open different CSV…")
         reload_btn.setFixedWidth(165)
         reload_btn.clicked.connect(self._open_csv)
+        clear_btn = QPushButton("Clear data")
+        clear_btn.setFixedWidth(90)
+        clear_btn.setProperty("role", "destructive")
+        clear_btn.clicked.connect(self._clear_data)
         self._file_label = QLabel("")
         self._file_label.setStyleSheet(
             "color: #5a3a8e; font-weight: bold; padding-left: 4px;"
@@ -57,6 +62,7 @@ class DataTab(QWidget):
         self._summary_label = QLabel("")
         self._summary_label.setStyleSheet("color: #777777; font-size: 11px;")
         info_bar.addWidget(reload_btn)
+        info_bar.addWidget(clear_btn)
         info_bar.addSpacing(6)
         info_bar.addWidget(self._file_label)
         info_bar.addWidget(self._summary_label)
@@ -169,6 +175,25 @@ class DataTab(QWidget):
         return w
 
     # ── Slots ─────────────────────────────────────────────────────────────────
+
+    def _clear_data(self):
+        reply = QMessageBox.question(
+            self, "Clear data",
+            "Clear the loaded dataset and return to the start screen?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._df = None
+        self._sentinels = {}
+        self._sentinel_checks = {}
+        self._table.setRowCount(0)
+        self._file_label.setText("")
+        self._summary_label.setText("")
+        self._confirm_btn.setEnabled(False)
+        self._content_area.setVisible(False)
+        self._welcome.setVisible(True)
+        self.data_cleared.emit()
 
     def _open_csv(self):
         path, _ = QFileDialog.getOpenFileName(

@@ -98,6 +98,20 @@ QPushButton[role="primary"]:disabled {{
     color: white;
 }}
 
+/* Destructive action — red outlined */
+QPushButton[role="destructive"] {{
+    background: white;
+    color: {RED};
+    border: 1px solid {RED};
+    font-weight: bold;
+}}
+QPushButton[role="destructive"]:hover {{
+    background: #fdecea;
+}}
+QPushButton[role="destructive"]:pressed {{
+    background: #f5b7b1;
+}}
+
 /* Export action — purple filled */
 QPushButton[role="export"] {{
     background: {PURPLE};
