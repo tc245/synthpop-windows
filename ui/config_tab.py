@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QSpinBox, QCheckBox, QComboBox,
     QGroupBox, QRadioButton, QButtonGroup, QListWidget,
     QListWidgetItem, QProgressBar, QScrollArea, QMessageBox,
-    QSizePolicy, QFrame,
+    QSizePolicy, QFrame, QDialog, QLineEdit, QDialogButtonBox,
 )
 from PySide6.QtCore import QThread
 
@@ -13,6 +13,108 @@ from ui.synthesis_worker import SynthesisWorker
 from ui.widgets import CollapsibleBanner, tooltip_badge, with_tip
 
 _GC_DISTRIBUTIONS = ["beta", "norm", "truncnorm", "uniform"]
+
+
+class ColumnSelectionDialog(QDialog):
+    """Pop-up checklist for choosing which columns to include in synthesis."""
+
+    def __init__(self, col_states: dict, col_types: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Columns for Synthesis")
+        self.setMinimumSize(420, 500)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        # Search bar
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Filter columns…")
+        self._search.textChanged.connect(self._filter)
+        layout.addWidget(self._search)
+
+        # Select All / Deselect All
+        btn_row = QHBoxLayout()
+        sel_all = QPushButton("Select All")
+        desel_all = QPushButton("Deselect All")
+        sel_all.setFixedWidth(100)
+        desel_all.setFixedWidth(100)
+        sel_all.clicked.connect(self._select_all)
+        desel_all.clicked.connect(self._deselect_all)
+        self._summary = QLabel()
+        self._summary.setStyleSheet("color:#777; font-size:11px;")
+        btn_row.addWidget(sel_all)
+        btn_row.addWidget(desel_all)
+        btn_row.addStretch()
+        btn_row.addWidget(self._summary)
+        layout.addLayout(btn_row)
+
+        # Column list
+        self._list = QListWidget()
+        self._list.itemChanged.connect(self._update_summary)
+        layout.addWidget(self._list, stretch=1)
+
+        # Hint
+        hint = QLabel("Columns set to 'ignore' on the Load Data tab are excluded automatically.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#777; font-size:11px; font-style:italic;")
+        layout.addWidget(hint)
+
+        # OK / Cancel
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        # Populate
+        self._col_states = dict(col_states)
+        self._col_types = col_types
+        for col, checked in col_states.items():
+            self._add_item(col, checked)
+        self._update_summary()
+
+    def _add_item(self, col: str, checked: bool):
+        vtype = self._col_types.get(col, "")
+        item = QListWidgetItem(f"{col}  [{vtype}]")
+        item.setData(Qt.ItemDataRole.UserRole, col)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        self._list.addItem(item)
+
+    def _filter(self, text: str):
+        text = text.lower()
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            item.setHidden(text not in item.text().lower())
+
+    def _select_all(self):
+        for i in range(self._list.count()):
+            if not self._list.item(i).isHidden():
+                self._list.item(i).setCheckState(Qt.CheckState.Checked)
+
+    def _deselect_all(self):
+        for i in range(self._list.count()):
+            if not self._list.item(i).isHidden():
+                self._list.item(i).setCheckState(Qt.CheckState.Unchecked)
+
+    def _update_summary(self):
+        total = self._list.count()
+        checked = sum(
+            1 for i in range(total)
+            if self._list.item(i).checkState() == Qt.CheckState.Checked
+        )
+        self._summary.setText(f"{checked} of {total} selected")
+
+    def result_states(self) -> dict:
+        """Return {col: bool} of final checked states."""
+        states = {}
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            states[item.data(Qt.ItemDataRole.UserRole)] = (
+                item.checkState() == Qt.CheckState.Checked
+            )
+        return states
 
 
 class ConfigTab(QWidget):
@@ -24,6 +126,8 @@ class ConfigTab(QWidget):
         super().__init__(parent)
         self._df = None
         self._variable_types = {}
+        self._col_states: dict[str, bool] = {}   # col → included
+        self._col_types: dict[str, str] = {}     # col → type label
         self._worker = None
         self._thread = None
         self._build_ui()
@@ -226,31 +330,23 @@ class ConfigTab(QWidget):
 
         # ── Column selection group ────────────────────────────────────────────
         col_box = QGroupBox("Column selection")
-        col_layout = QVBoxLayout(col_box)
-        sel_btns = QHBoxLayout()
-        self._select_all_btn = QPushButton("Select All")
-        self._deselect_all_btn = QPushButton("Deselect All")
-        self._select_all_btn.setFixedWidth(90)
-        self._deselect_all_btn.setFixedWidth(90)
-        sel_btns.addWidget(self._select_all_btn)
-        sel_btns.addWidget(self._deselect_all_btn)
-        sel_btns.addWidget(tooltip_badge(
+        col_layout = QHBoxLayout(col_box)
+        self._col_select_btn = QPushButton("Choose columns…")
+        self._col_select_btn.setFixedWidth(150)
+        self._col_select_btn.clicked.connect(self._open_column_dialog)
+        self._col_summary_label = QLabel("No data loaded")
+        self._col_summary_label.setStyleSheet("color:#5a3a8e; font-size:12px;")
+        col_layout.addWidget(self._col_select_btn)
+        col_layout.addWidget(tooltip_badge(
             "<p><b>Column selection</b></p>"
-            "<p>Tick columns to include in the synthetic dataset. "
+            "<p>Choose which columns to include in the synthetic dataset. "
             "Columns marked <i>ignore</i> on the Load Data tab are "
-            "excluded automatically. Untick columns you want to omit "
-            "even if they were classified as categorical or numeric.</p>"
+            "excluded automatically. Untick any column you want to omit "
+            "even if it was classified as categorical or numeric.</p>"
         ))
-        sel_btns.addStretch()
-        col_layout.addLayout(sel_btns)
-        self._col_list = QListWidget()
-        self._col_list.setFixedHeight(180)
-        col_layout.addWidget(self._col_list)
-        self._col_hint = QLabel("Ignored-type columns are excluded automatically.")
-        self._col_hint.setStyleSheet(
-            "color: #777777; font-size: 11px; font-style: italic;"
-        )
-        col_layout.addWidget(self._col_hint)
+        col_layout.addSpacing(8)
+        col_layout.addWidget(self._col_summary_label)
+        col_layout.addStretch()
         form_layout.addWidget(col_box)
 
         form_layout.addStretch()
@@ -315,8 +411,6 @@ class ConfigTab(QWidget):
         # ── Signal wiring ─────────────────────────────────────────────────────
         self._cart_radio.toggled.connect(self._on_method_changed)
         self._max_train_rows.valueChanged.connect(self._on_mtr_changed)
-        self._select_all_btn.clicked.connect(self._select_all)
-        self._deselect_all_btn.clicked.connect(self._deselect_all)
         self._estimate_btn.clicked.connect(self._estimate_time)
         self._generate_btn.clicked.connect(self._generate)
         self._cancel_btn.clicked.connect(self._cancel)
@@ -340,37 +434,33 @@ class ConfigTab(QWidget):
             self._smoothing, self._proper, self._minibucket, self._random_state,
             self._enforce_min_max, self._enforce_rounding, self._default_dist,
             self._skip_imputation, self._max_train_rows,
-            self._select_all_btn, self._deselect_all_btn, self._col_list,
-            self._estimate_btn, self._generate_btn,
+            self._col_select_btn, self._estimate_btn, self._generate_btn,
         ]:
             w.setEnabled(enabled)
 
     def _populate_columns(self, variable_types: dict):
-        self._col_list.clear()
+        self._col_states = {}
+        self._col_types = {}
         for col, vtype in variable_types.items():
             if vtype == "ignore":
                 continue
-            item = QListWidgetItem(f"{col}  [{vtype}]")
-            item.setData(Qt.ItemDataRole.UserRole, col)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Checked)
-            self._col_list.addItem(item)
+            self._col_states[col] = True
+            self._col_types[col] = vtype
+        self._update_col_summary()
+
+    def _update_col_summary(self):
+        total = len(self._col_states)
+        selected = sum(1 for v in self._col_states.values() if v)
+        self._col_summary_label.setText(f"{selected} of {total} columns included")
 
     def _selected_columns(self) -> list:
-        cols = []
-        for i in range(self._col_list.count()):
-            item = self._col_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
-                cols.append(item.data(Qt.ItemDataRole.UserRole))
-        return cols
+        return [col for col, inc in self._col_states.items() if inc]
 
-    def _select_all(self):
-        for i in range(self._col_list.count()):
-            self._col_list.item(i).setCheckState(Qt.CheckState.Checked)
-
-    def _deselect_all(self):
-        for i in range(self._col_list.count()):
-            self._col_list.item(i).setCheckState(Qt.CheckState.Unchecked)
+    def _open_column_dialog(self):
+        dlg = ColumnSelectionDialog(self._col_states, self._col_types, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._col_states = dlg.result_states()
+            self._update_col_summary()
 
     @Slot(bool)
     def _on_method_changed(self, cart_checked: bool):
