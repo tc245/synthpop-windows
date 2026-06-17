@@ -218,14 +218,14 @@ def render_report_html(report: dict) -> str:
 
     parts = [
         "<html><head><style>",
-        "body{font-family:Arial,sans-serif;font-size:12px;margin:8px;}",
-        "h2{font-size:13px;color:#333;border-bottom:1px solid #ccc;"
+        "body{font-family:Arial,sans-serif;font-size:14px;margin:8px;}",
+        "h2{font-size:15px;color:#333;border-bottom:1px solid #ccc;"
         "padding-bottom:3px;margin-top:12px;margin-bottom:4px;}",
-        "h3{font-size:11px;color:#555;margin-top:8px;margin-bottom:2px;}",
-        "table{border-collapse:collapse;margin-bottom:8px;font-size:11px;}",
-        "th{background:#f0f0f0;padding:3px 6px;border:1px solid #ccc;text-align:left;}",
-        "td{padding:3px 6px;border:1px solid #ccc;}",
-        ".muted{color:#777;font-size:11px;}",
+        "h3{font-size:13px;color:#555;margin-top:8px;margin-bottom:2px;}",
+        "table{border-collapse:collapse;margin-bottom:8px;font-size:13px;}",
+        "th{background:#f0f0f0;padding:4px 8px;border:1px solid #ccc;text-align:left;}",
+        "td{padding:4px 8px;border:1px solid #ccc;}",
+        ".muted{color:#777;font-size:13px;}",
         ".warn{color:orange;}",
         ".col-divider{border-right:1px solid #e0d8f0;padding-right:12px;}",
         ".col-right{padding-left:12px;}",
@@ -338,12 +338,12 @@ def render_report_html(report: dict) -> str:
             "<table width='100%' cellspacing='0' cellpadding='0'>"
             "<tr>"
             "<td width='50%' class='col-divider' style='padding-bottom:4px;'>"
-            "<h1 style='font-size:14px;color:#333;margin:0 0 6px 0;"
+            "<h1 style='font-size:16px;color:#333;margin:0 0 6px 0;"
             "border-bottom:2px solid #9063CD;padding-bottom:4px;'>"
             "Numeric Variable Summary</h1>"
             "</td>"
             "<td width='50%' class='col-right' style='padding-bottom:4px;'>"
-            "<h1 style='font-size:14px;color:#333;margin:0 0 6px 0;"
+            "<h1 style='font-size:16px;color:#333;margin:0 0 6px 0;"
             "border-bottom:2px solid #9063CD;padding-bottom:4px;'>"
             "Categorical Variable Summary</h1>"
             "</td>"
