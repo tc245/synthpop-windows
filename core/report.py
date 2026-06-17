@@ -203,8 +203,15 @@ def build_synth_report(orig_df, synth_df, variable_types):
     return report
 
 
-def render_report_html(report: dict) -> str:
-    """Convert a build_synth_report() result dict to self-contained HTML for QTextBrowser."""
+def render_report_html(report: dict, collapsed: set = None) -> str:
+    """Convert a build_synth_report() result dict to self-contained HTML for QTextBrowser.
+
+    collapsed: set of section IDs to render collapsed. Supported IDs:
+        'num_summary', 'ks_tests', 'chi2_tests', 'cat_freq', 'corr'
+        Individual cat_freq variables: 'cat_freq::<col>'
+    """
+    if collapsed is None:
+        collapsed = set()
 
     def _val(v):
         return "—" if v is None else str(v)
@@ -215,6 +222,22 @@ def render_report_html(report: dict) -> str:
         if passed:
             return "<td align='center' style='color:green;font-weight:bold;'>✓</td>"
         return "<td align='center' style='color:red;font-weight:bold;'>✗</td>"
+
+    def _h2(sec_id, title):
+        arrow = "▶" if sec_id in collapsed else "▼"
+        return (
+            f"<h2><a href='toggle:{sec_id}' "
+            f"style='color:#5a3a8e;text-decoration:none;'>{arrow}</a>"
+            f" {title}</h2>"
+        )
+
+    def _h3_toggle(sec_id, title):
+        arrow = "▶" if sec_id in collapsed else "▼"
+        return (
+            f"<h3><a href='toggle:{sec_id}' "
+            f"style='color:#5a3a8e;text-decoration:none;'>{arrow}</a>"
+            f" {title}</h3>"
+        )
 
     parts = [
         "<html><head><style>",
@@ -243,94 +266,97 @@ def render_report_html(report: dict) -> str:
 
     ns = report.get("numeric_summary")
     if ns and ns["rows"]:
-        left.append("<h2>Numeric summary <span class='muted'>(min/max excluded)</span></h2>")
-        left.append("<table><thead><tr><th>Stat</th>")
-        for col in ns["num_vars"]:
-            left.append(f"<th colspan='2' align='center'>{col}</th>")
-        left.append("</tr><tr><th></th>")
-        for _ in ns["num_vars"]:
-            left.append(
-                "<th class='muted' align='right'>Real</th>"
-                "<th class='muted' align='right'>Synth</th>"
-            )
-        left.append("</tr></thead><tbody>")
-        for row in ns["rows"]:
-            left.append(f"<tr><td><code>{row['stat']}</code></td>")
+        left.append(_h2("num_summary", "Numeric summary <span class='muted'>(min/max excluded)</span>"))
+        if "num_summary" not in collapsed:
+            left.append("<table><thead><tr><th>Stat</th>")
             for col in ns["num_vars"]:
+                left.append(f"<th colspan='2' align='center'>{col}</th>")
+            left.append("</tr><tr><th></th>")
+            for _ in ns["num_vars"]:
                 left.append(
-                    f"<td align='right'>{_val(row.get(col+'__real'))}</td>"
-                    f"<td align='right'>{_val(row.get(col+'__synth'))}</td>"
+                    "<th class='muted' align='right'>Real</th>"
+                    "<th class='muted' align='right'>Synth</th>"
                 )
-            left.append("</tr>")
-        left.append("</tbody></table>")
+            left.append("</tr></thead><tbody>")
+            for row in ns["rows"]:
+                left.append(f"<tr><td><code>{row['stat']}</code></td>")
+                for col in ns["num_vars"]:
+                    left.append(
+                        f"<td align='right'>{_val(row.get(col+'__real'))}</td>"
+                        f"<td align='right'>{_val(row.get(col+'__synth'))}</td>"
+                    )
+                left.append("</tr>")
+            left.append("</tbody></table>")
 
     if report.get("ks_tests"):
-        left.append("<h2>Kolmogorov–Smirnov tests</h2>")
-        left.append(
-            "<table><thead><tr>"
-            "<th>Variable</th><th align='right'>KS</th>"
-            "<th align='right'>p-value</th><th align='center'>Pass</th>"
-            "</tr></thead><tbody>"
-        )
-        for row in report["ks_tests"]:
+        left.append(_h2("ks_tests", "Kolmogorov–Smirnov tests"))
+        if "ks_tests" not in collapsed:
             left.append(
-                f"<tr><td><code>{row['variable']}</code></td>"
-                f"<td align='right'>{_val(row['statistic'])}</td>"
-                f"<td align='right'>{_val(row['pvalue'])}</td>"
-                f"{_pass_cell(row['pass'])}</tr>"
+                "<table><thead><tr>"
+                "<th>Variable</th><th align='right'>KS</th>"
+                "<th align='right'>p-value</th><th align='center'>Pass</th>"
+                "</tr></thead><tbody>"
             )
-        left.append("</tbody></table>")
+            for row in report["ks_tests"]:
+                left.append(
+                    f"<tr><td><code>{row['variable']}</code></td>"
+                    f"<td align='right'>{_val(row['statistic'])}</td>"
+                    f"<td align='right'>{_val(row['pvalue'])}</td>"
+                    f"{_pass_cell(row['pass'])}</tr>"
+                )
+            left.append("</tbody></table>")
 
     # ── Build right column (categorical) ──────────────────────────────────────
     right = []
 
     if report.get("chi2_tests"):
-        right.append("<h2>Chi-squared tests</h2>")
-        right.append(
-            "<table><thead><tr>"
-            "<th>Variable</th><th align='right'>χ²</th>"
-            "<th align='right'>p-value</th><th align='center'>Pass</th>"
-            "</tr></thead><tbody>"
-        )
-        for row in report["chi2_tests"]:
-            right.append(
-                f"<tr><td><code>{row['variable']}</code></td>"
-                f"<td align='right'>{_val(row['statistic'])}</td>"
-                f"<td align='right'>{_val(row['pvalue'])}</td>"
-                f"{_pass_cell(row['pass'])}</tr>"
-            )
-        right.append("</tbody></table>")
-
-    if report.get("cat_freq"):
-        right.append("<h2>Categorical frequency comparison</h2>")
-        for col, cats in report["cat_freq"].items():
-            right.append(
-                f"<h3><code>{col}</code>"
-                f" <span class='muted'>({len(cats)} categories)</span></h3>"
-            )
+        right.append(_h2("chi2_tests", "Chi-squared tests"))
+        if "chi2_tests" not in collapsed:
             right.append(
                 "<table><thead><tr>"
-                "<th>Category</th><th align='right'>Real %</th>"
-                "<th align='right'>Synth %</th><th align='right'>Diff</th>"
+                "<th>Variable</th><th align='right'>χ²</th>"
+                "<th align='right'>p-value</th><th align='center'>Pass</th>"
                 "</tr></thead><tbody>"
             )
-            for c in cats[:50]:
-                real_pct = c["real_pct"] or 0.0
-                synth_pct = c["synth_pct"] or 0.0
-                diff = abs(real_pct - synth_pct)
-                warn = " class='warn'" if diff > 5 else ""
+            for row in report["chi2_tests"]:
                 right.append(
-                    f"<tr><td>{c['category']}</td>"
-                    f"<td align='right'>{real_pct}</td>"
-                    f"<td align='right'>{synth_pct}</td>"
-                    f"<td align='right'{warn}>{diff:.1f}</td></tr>"
-                )
-            if len(cats) > 50:
-                right.append(
-                    f"<tr><td colspan='4' class='muted'>"
-                    f"… {len(cats) - 50} more not shown</td></tr>"
+                    f"<tr><td><code>{row['variable']}</code></td>"
+                    f"<td align='right'>{_val(row['statistic'])}</td>"
+                    f"<td align='right'>{_val(row['pvalue'])}</td>"
+                    f"{_pass_cell(row['pass'])}</tr>"
                 )
             right.append("</tbody></table>")
+
+    if report.get("cat_freq"):
+        right.append(_h2("cat_freq", "Categorical frequency comparison"))
+        if "cat_freq" not in collapsed:
+            for col, cats in report["cat_freq"].items():
+                sec_id = f"cat_freq::{col}"
+                right.append(_h3_toggle(sec_id, f"<code>{col}</code> <span class='muted'>({len(cats)} categories)</span>"))
+                if sec_id not in collapsed:
+                    right.append(
+                        "<table><thead><tr>"
+                        "<th>Category</th><th align='right'>Real %</th>"
+                        "<th align='right'>Synth %</th><th align='right'>Diff</th>"
+                        "</tr></thead><tbody>"
+                    )
+                    for c in cats[:50]:
+                        real_pct = c["real_pct"] or 0.0
+                        synth_pct = c["synth_pct"] or 0.0
+                        diff = abs(real_pct - synth_pct)
+                        warn = " class='warn'" if diff > 5 else ""
+                        right.append(
+                            f"<tr><td>{c['category']}</td>"
+                            f"<td align='right'>{real_pct}</td>"
+                            f"<td align='right'>{synth_pct}</td>"
+                            f"<td align='right'{warn}>{diff:.1f}</td></tr>"
+                        )
+                    if len(cats) > 50:
+                        right.append(
+                            f"<tr><td colspan='4' class='muted'>"
+                            f"… {len(cats) - 50} more not shown</td></tr>"
+                        )
+                    right.append("</tbody></table>")
 
     # ── Layout: two columns when both sides have content, else single column ──
     if left and right:
@@ -366,22 +392,24 @@ def render_report_html(report: dict) -> str:
         )
 
     # ── Correlation heatmap (full width below columns) ────────────────────────
-    if report.get("corr_heatmap_b64"):
-        parts.append("<h2>Correlation structure — real vs synthetic</h2>")
-        parts.append(
-            f"<img src='data:image/png;base64,{report['corr_heatmap_b64']}' "
-            f"width='100%' alt='Correlation heatmap'/>"
-        )
-        if report.get("mean_corr_diff") is not None:
-            parts.append(
-                f"<p class='muted' align='center'>Mean absolute correlation difference "
-                f"(upper triangle): <strong>{report['mean_corr_diff']:.4f}</strong></p>"
-            )
-    elif report.get("corr_heatmap_error"):
-        parts.append(
-            f"<p class='warn'>Correlation heatmap could not be generated: "
-            f"{report['corr_heatmap_error']}</p>"
-        )
+    if report.get("corr_heatmap_b64") or report.get("corr_heatmap_error"):
+        parts.append(_h2("corr", "Correlation structure — real vs synthetic"))
+        if "corr" not in collapsed:
+            if report.get("corr_heatmap_b64"):
+                parts.append(
+                    f"<img src='data:image/png;base64,{report['corr_heatmap_b64']}' "
+                    f"width='100%' alt='Correlation heatmap'/>"
+                )
+                if report.get("mean_corr_diff") is not None:
+                    parts.append(
+                        f"<p class='muted' align='center'>Mean absolute correlation difference "
+                        f"(upper triangle): <strong>{report['mean_corr_diff']:.4f}</strong></p>"
+                    )
+            else:
+                parts.append(
+                    f"<p class='warn'>Correlation heatmap could not be generated: "
+                    f"{report['corr_heatmap_error']}</p>"
+                )
 
     parts.append("</body></html>")
     return "".join(parts)

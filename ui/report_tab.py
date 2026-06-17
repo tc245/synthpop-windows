@@ -1,6 +1,6 @@
 import base64
 
-from PySide6.QtCore import QByteArray, Qt, QThread, Slot
+from PySide6.QtCore import QByteArray, Qt, QThread, QUrl, Slot
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
@@ -30,6 +30,7 @@ class ReportTab(QWidget):
         self._synth_df = None
         self._worker = None
         self._thread = None
+        self._collapsed: set = set()
         self._build_ui()
 
     def _build_ui(self):
@@ -77,6 +78,7 @@ class ReportTab(QWidget):
         # Report browser
         self._browser = QTextBrowser()
         self._browser.setOpenLinks(False)
+        self._browser.anchorClicked.connect(self._on_anchor_clicked)
         root.addWidget(self._browser, stretch=1)
 
     # ── Status badge ─────────────────────────────────────────────────────────
@@ -101,6 +103,7 @@ class ReportTab(QWidget):
         self._synth_df = synth_df
         self._report = None
         self._html = None
+        self._collapsed = set()
         self._save_csv_btn.setEnabled(True)
         self._save_html_btn.setEnabled(False)
         self._browser.setHtml("<p style='color:#888;'>Building report…</p>")
@@ -126,49 +129,50 @@ class ReportTab(QWidget):
     @Slot(dict, str)
     def _on_report_ready(self, report: dict, html: str):
         self._report = report
-        self._html = html  # keep original (with data: URI) for Save HTML export
+        self._html = html  # kept fully-expanded for Save HTML export
         self._progress.setVisible(False)
         self._set_status(
             "ready",
             f"Report ready — {report['n_orig']:,} original rows, "
             f"{report['n_synth']:,} synthetic rows",
         )
+        self._render_to_browser()
+        self._save_html_btn.setEnabled(True)
 
-        # QTextBrowser cannot render data: URI images — Qt's URL handling
-        # truncates the base64 payload before it reaches loadResource().
-        # All URL/cache-based workarounds also fail because setHtml() calls
-        # document.clear() which wipes any pre-registered resources.
-        #
-        # Solution: replace the <img> tag with a plain-text marker, call
-        # setHtml(), then use QTextCursor.insertImage(QImage) to embed the
-        # decoded image directly into the document.  No URL lookup involved.
+    def _render_to_browser(self):
+        """Re-render the report with current collapse state into the browser."""
+        if self._report is None:
+            return
+        from core.report import render_report_html
+        display_html = render_report_html(self._report, self._collapsed)
+
+        # QTextBrowser cannot render data: URI images.  Replace the <img> tag
+        # with a plain-text marker, call setHtml(), then embed the decoded
+        # image directly via QTextCursor.insertImage().
         heatmap_img: QImage | None = None
-        display_html = html
-        b64 = report.get("corr_heatmap_b64")
-        if b64:
+        b64 = self._report.get("corr_heatmap_b64")
+        if b64 and "corr" not in self._collapsed:
             try:
                 img = QImage()
                 img.loadFromData(QByteArray(base64.b64decode(b64)))
                 if not img.isNull():
                     heatmap_img = img
-                    # Exact tag text produced by core/report.py
                     img_tag = (
                         f"<img src='data:image/png;base64,{b64}' "
                         f"width='100%' alt='Correlation heatmap'/>"
                     )
-                    display_html = html.replace(img_tag, _HEATMAP_MARKER)
+                    display_html = display_html.replace(img_tag, _HEATMAP_MARKER)
             except Exception as exc:
                 print(f"[report] heatmap decode failed: {exc}", flush=True)
 
         self._browser.setHtml(display_html)
 
-        # Locate the marker in the rendered document and swap it for the image.
         if heatmap_img is not None:
             cursor = self._browser.document().find(_HEATMAP_MARKER)
             if not cursor.isNull():
                 cursor.removeSelectedText()
                 vp_w = self._browser.viewport().width() - 30
-                if vp_w > 100 and not heatmap_img.isNull():
+                if vp_w > 100:
                     scale = vp_w / heatmap_img.width()
                     display_img = heatmap_img.scaled(
                         vp_w,
@@ -179,10 +183,18 @@ class ReportTab(QWidget):
                 else:
                     display_img = heatmap_img
                 cursor.insertImage(display_img)
-            else:
-                print("[report] heatmap marker not found in document", flush=True)
 
-        self._save_html_btn.setEnabled(True)
+    @Slot(QUrl)
+    def _on_anchor_clicked(self, url: QUrl):
+        if url.scheme() != "toggle":
+            return
+        from urllib.parse import unquote
+        sec_id = unquote(url.toString()[len("toggle:"):])
+        if sec_id in self._collapsed:
+            self._collapsed.discard(sec_id)
+        else:
+            self._collapsed.add(sec_id)
+        self._render_to_browser()
 
     @Slot(str)
     def _on_report_error(self, err: str):
