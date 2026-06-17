@@ -5,18 +5,151 @@ import io
 
 # ── PDF ───────────────────────────────────────────────────────────────────────
 
-def export_pdf(report: dict, path: str) -> None:
-    """Write the report to a PDF file using Qt's built-in PDF printer.
+def _render_pdf_html(report: dict) -> str:
+    """Generate Qt-safe HTML for QPrinter / QTextDocument.
 
-    Renders a flat single-column HTML layout (for_pdf=True) so that
-    QTextDocument can handle it — it does not support nested tables.
+    Rules enforced here:
+    - No <thead>/<tbody>/<tfoot>  — Qt ignores unknown tags AND their children
+    - No CSS class selectors      — QTextDocument support is unreliable
+    - No border-collapse CSS      — use cellspacing/cellpadding attributes instead
+    - No nested tables            — outer layout is headings, not a wrapper table
+    - No <code> tags              — plain text only
     """
-    from core.report import render_report_html
+    _TH = "padding:4px 8px;background:#f0f0f0;font-weight:bold;border:1px solid #ccc;"
+    _TD = "padding:4px 8px;border:1px solid #ccc;"
+    _H2 = "font-size:15px;color:#333;border-bottom:2px solid #9063CD;padding-bottom:3px;margin-top:14px;"
+    _H3 = "font-size:13px;color:#555;margin-top:8px;margin-bottom:2px;"
+    _BODY = "font-family:Arial,sans-serif;font-size:13px;margin:8px;"
+
+    def _v(val):
+        return "—" if val is None else str(val)
+
+    def _pass(passed):
+        if passed is None:
+            return f"<td style='{_TD}text-align:center;'>—</td>"
+        if passed:
+            return f"<td style='{_TD}text-align:center;color:green;font-weight:bold;'>✓</td>"
+        return f"<td style='{_TD}text-align:center;color:red;font-weight:bold;'>✗</td>"
+
+    p = [f"<html><body style='{_BODY}'>"]
+    p.append(
+        f"<p style='color:#555;'>Original: <b>{report['n_orig']:,}</b> rows"
+        f"&nbsp;·&nbsp;Synthetic: <b>{report['n_synth']:,}</b> rows</p>"
+    )
+
+    # ── Numeric summary ───────────────────────────────────────────────────────
+    ns = report.get("numeric_summary")
+    if ns and ns["rows"]:
+        p.append(f"<h2 style='{_H2}'>Numeric Variable Summary</h2>")
+        p.append(f"<h3 style='{_H3}'>Summary statistics</h3>")
+        p.append("<table cellspacing='0' cellpadding='0' width='100%'>")
+        # Header — no colspan; write var name once then empty header for synth col
+        p.append(f"<tr><th style='{_TH}'>Statistic</th>")
+        for col in ns["num_vars"]:
+            p.append(f"<th style='{_TH}'>{col} (Real)</th>")
+            p.append(f"<th style='{_TH}'>{col} (Synth)</th>")
+        p.append("</tr>")
+        for row in ns["rows"]:
+            p.append(f"<tr><td style='{_TD}'>{row['stat']}</td>")
+            for col in ns["num_vars"]:
+                p.append(f"<td style='{_TD}text-align:right;'>{_v(row.get(col+'__real'))}</td>")
+                p.append(f"<td style='{_TD}text-align:right;'>{_v(row.get(col+'__synth'))}</td>")
+            p.append("</tr>")
+        p.append("</table>")
+
+    if report.get("ks_tests"):
+        p.append(f"<h3 style='{_H3}'>Kolmogorov–Smirnov tests</h3>")
+        p.append("<table cellspacing='0' cellpadding='0'>")
+        p.append(
+            f"<tr><th style='{_TH}'>Variable</th>"
+            f"<th style='{_TH}'>KS statistic</th>"
+            f"<th style='{_TH}'>p-value</th>"
+            f"<th style='{_TH}'>Pass</th></tr>"
+        )
+        for row in report["ks_tests"]:
+            p.append(
+                f"<tr><td style='{_TD}'>{row['variable']}</td>"
+                f"<td style='{_TD}text-align:right;'>{_v(row['statistic'])}</td>"
+                f"<td style='{_TD}text-align:right;'>{_v(row['pvalue'])}</td>"
+                f"{_pass(row['pass'])}</tr>"
+            )
+        p.append("</table>")
+
+    # ── Categorical summary ───────────────────────────────────────────────────
+    if report.get("chi2_tests") or report.get("cat_freq"):
+        p.append(f"<h2 style='{_H2}'>Categorical Variable Summary</h2>")
+
+    if report.get("chi2_tests"):
+        p.append(f"<h3 style='{_H3}'>Chi-squared tests</h3>")
+        p.append("<table cellspacing='0' cellpadding='0'>")
+        p.append(
+            f"<tr><th style='{_TH}'>Variable</th>"
+            f"<th style='{_TH}'>χ² statistic</th>"
+            f"<th style='{_TH}'>p-value</th>"
+            f"<th style='{_TH}'>Pass</th></tr>"
+        )
+        for row in report["chi2_tests"]:
+            p.append(
+                f"<tr><td style='{_TD}'>{row['variable']}</td>"
+                f"<td style='{_TD}text-align:right;'>{_v(row['statistic'])}</td>"
+                f"<td style='{_TD}text-align:right;'>{_v(row['pvalue'])}</td>"
+                f"{_pass(row['pass'])}</tr>"
+            )
+        p.append("</table>")
+
+    if report.get("cat_freq"):
+        p.append(f"<h3 style='{_H3}'>Categorical frequency comparison</h3>")
+        for col, cats in report["cat_freq"].items():
+            p.append(f"<p style='margin-top:6px;margin-bottom:2px;font-weight:bold;'>{col} ({len(cats)} categories)</p>")
+            p.append("<table cellspacing='0' cellpadding='0'>")
+            p.append(
+                f"<tr><th style='{_TH}'>Category</th>"
+                f"<th style='{_TH}'>Real %</th>"
+                f"<th style='{_TH}'>Synth %</th>"
+                f"<th style='{_TH}'>Diff</th></tr>"
+            )
+            for c in cats[:50]:
+                real_pct = c["real_pct"] or 0.0
+                synth_pct = c["synth_pct"] or 0.0
+                diff = abs(real_pct - synth_pct)
+                diff_style = f"{_TD}text-align:right;color:red;" if diff > 5 else f"{_TD}text-align:right;"
+                p.append(
+                    f"<tr><td style='{_TD}'>{c['category']}</td>"
+                    f"<td style='{_TD}text-align:right;'>{real_pct}</td>"
+                    f"<td style='{_TD}text-align:right;'>{synth_pct}</td>"
+                    f"<td style='{diff_style}'>{diff:.1f}</td></tr>"
+                )
+            if len(cats) > 50:
+                p.append(
+                    f"<tr><td style='{_TD}color:#777;' colspan='4'>"
+                    f"… {len(cats) - 50} more categories not shown</td></tr>"
+                )
+            p.append("</table>")
+
+    # ── Correlation heatmap ───────────────────────────────────────────────────
+    if report.get("corr_heatmap_b64"):
+        p.append(f"<h2 style='{_H2}'>Correlation Structure — Real vs Synthetic</h2>")
+        p.append(
+            f"<img src='data:image/png;base64,{report[\"corr_heatmap_b64\"]}' width='100%'/>"
+        )
+        if report.get("mean_corr_diff") is not None:
+            p.append(
+                f"<p style='text-align:center;color:#555;'>"
+                f"Mean absolute correlation difference (upper triangle): "
+                f"<b>{report['mean_corr_diff']:.4f}</b></p>"
+            )
+
+    p.append("</body></html>")
+    return "".join(p)
+
+
+def export_pdf(report: dict, path: str) -> None:
+    """Write the report to a PDF file using Qt's built-in PDF printer."""
     from PySide6.QtCore import QMarginsF
     from PySide6.QtGui import QPageLayout, QPageSize, QTextDocument
     from PySide6.QtPrintSupport import QPrinter
 
-    html = render_report_html(report, collapsed=set(), for_pdf=True)
+    html = _render_pdf_html(report)
 
     printer = QPrinter(QPrinter.PrinterMode.HighResolution)
     printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
