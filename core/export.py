@@ -38,23 +38,34 @@ def _render_pdf_html(report: dict) -> str:
     )
 
     # ── Numeric summary ───────────────────────────────────────────────────────
+    # Transposed to (variable, statistic) rows so the table stays 4 columns
+    # wide regardless of how many numeric variables the dataset has.
     ns = report.get("numeric_summary")
     if ns and ns["rows"]:
         p.append(f"<h2 style='{_H2}'>Numeric Variable Summary</h2>")
         p.append(f"<h3 style='{_H3}'>Summary statistics</h3>")
         p.append("<table cellspacing='0' cellpadding='0' width='100%'>")
-        # Header — no colspan; write var name once then empty header for synth col
-        p.append(f"<tr><th style='{_TH}'>Statistic</th>")
+        p.append(
+            f"<tr><th style='{_TH}'>Variable</th>"
+            f"<th style='{_TH}'>Statistic</th>"
+            f"<th style='{_TH}text-align:right;'>Real</th>"
+            f"<th style='{_TH}text-align:right;'>Synthetic</th></tr>"
+        )
         for col in ns["num_vars"]:
-            p.append(f"<th style='{_TH}'>{col} (Real)</th>")
-            p.append(f"<th style='{_TH}'>{col} (Synth)</th>")
-        p.append("</tr>")
-        for row in ns["rows"]:
-            p.append(f"<tr><td style='{_TD}'>{row['stat']}</td>")
-            for col in ns["num_vars"]:
-                p.append(f"<td style='{_TD}text-align:right;'>{_v(row.get(col+'__real'))}</td>")
-                p.append(f"<td style='{_TD}text-align:right;'>{_v(row.get(col+'__synth'))}</td>")
-            p.append("</tr>")
+            first = True
+            for row in ns["rows"]:
+                var_cell = (
+                    f"<td style='{_TD}font-weight:bold;'>{col}</td>"
+                    if first else
+                    f"<td style='{_TD}'></td>"
+                )
+                p.append(
+                    f"<tr>{var_cell}"
+                    f"<td style='{_TD}'>{row['stat']}</td>"
+                    f"<td style='{_TD}text-align:right;'>{_v(row.get(col+'__real'))}</td>"
+                    f"<td style='{_TD}text-align:right;'>{_v(row.get(col+'__synth'))}</td></tr>"
+                )
+                first = False
         p.append("</table>")
 
     if report.get("ks_tests"):
