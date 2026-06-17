@@ -1,5 +1,8 @@
-from PySide6.QtCore import Slot
-from PySide6.QtGui import QAction
+import os
+import sys
+
+from PySide6.QtCore import Qt, Slot
+from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QTabWidget, QVBoxLayout, QWidget,
@@ -15,7 +18,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SLS Synthetic Data Generator")
+        self.setWindowTitle("LSCS Synthetic Data Generator")
         self.resize(1100, 760)
 
         self.source_df = None
@@ -49,16 +52,16 @@ class MainWindow(QMainWindow):
     def _show_about(self):
         QMessageBox.about(
             self,
-            "About SLS Synthetic Data Generator",
-            "<h3>SLS Synthetic Data Generator</h3>"
+            "About LSCS SynthPop",
+            "<h3>LSCS SynthPop</h3>"
             "<p><b>Version 1.0.0</b></p>"
             "<p>A standalone tool for generating privacy-preserving synthetic "
-            "datasets from CSV files, developed for the Scottish Longitudinal "
-            "Study Development &amp; Support Unit (SLS-DSU).</p>"
+            "datasets from CSV files, developed for "
+            "Longitudinal Cohort Studies Scotland (LSCS).</p>"
             "<p>Synthesis is powered by <b>python-synthpop</b>, a Python port "
             "of the R synthpop package.</p>"
-            "<p style='color:#777;'>© SLS-DSU &nbsp;·&nbsp; "
-            "sls.lscs.ac.uk</p>",
+            "<p style='color:#777;'>© LSCS &nbsp;·&nbsp; "
+            "lscs.ac.uk</p>",
         )
 
     # ── Header banner ─────────────────────────────────────────────────────────
@@ -77,24 +80,37 @@ class MainWindow(QMainWindow):
         h.setContentsMargins(18, 0, 18, 0)
         h.setSpacing(10)
 
-        brand = QLabel("SLS")
-        brand.setStyleSheet(
-            "color: white; font-size: 24px; font-weight: bold;"
-            " letter-spacing: 3px; background: transparent;"
-        )
+        # Logo image scaled to fit header height
+        logo_label = QLabel()
+        logo_label.setStyleSheet("background: transparent;")
+        base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        logo_path = os.path.join(os.path.dirname(base), "assets", "sls-logo-people.png")
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(base, "assets", "sls-logo-people.png")
+        logo_pix = QPixmap(logo_path)
+        if not logo_pix.isNull():
+            logo_pix = logo_pix.scaledToHeight(
+                34, Qt.TransformationMode.SmoothTransformation
+            )
+            logo_label.setPixmap(logo_pix)
+            # White bg logo needs a small white pill behind it
+            logo_label.setStyleSheet(
+                "background: white; border-radius: 4px; padding: 2px 6px;"
+            )
+
         divider = QLabel("|")
         divider.setStyleSheet("color: #b89ee0; font-size: 20px; background: transparent;")
-        subtitle = QLabel("Synthetic Data Generator")
+        subtitle = QLabel("SynthPop")
         subtitle.setStyleSheet(
-            "color: #e8dcff; font-size: 14px; font-weight: bold; background: transparent;"
+            "color: #e8dcff; font-size: 18px; font-weight: bold; background: transparent;"
         )
 
-        h.addWidget(brand)
+        h.addWidget(logo_label)
         h.addWidget(divider)
         h.addWidget(subtitle)
         h.addStretch()
 
-        org = QLabel("Scottish Longitudinal Study Development & Support Unit")
+        org = QLabel("Longitudinal Cohort Studies Scotland")
         org.setStyleSheet("color: #c0a8e8; font-size: 13px; background: transparent;")
         h.addWidget(org)
 

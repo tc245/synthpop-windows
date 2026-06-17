@@ -59,20 +59,20 @@ def _set_win32_icon(hwnd, ico_path: str):
 
 
 def _make_splash_pixmap():
-    """Build a branded splash-screen pixmap without needing an extra asset file."""
-    from PySide6.QtCore import Qt, QRect
+    """Build a branded splash-screen pixmap using the LSCS logo asset."""
+    from PySide6.QtCore import Qt, QRect, QRectF
     from PySide6.QtGui import (
         QColor, QFont, QLinearGradient, QPainter, QPixmap, QPen,
     )
 
-    W, H = 500, 300
+    W, H = 520, 310
     pix = QPixmap(W, H)
     pix.fill(QColor("#3d2570"))
 
     p = QPainter(pix)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-    # Gradient background: dark purple -> slightly lighter at bottom
+    # Gradient background
     grad = QLinearGradient(0, 0, 0, H)
     grad.setColorAt(0.0, QColor("#3d2570"))
     grad.setColorAt(1.0, QColor("#5a3a8e"))
@@ -81,34 +81,55 @@ def _make_splash_pixmap():
     # Accent bar across the top
     p.fillRect(0, 0, W, 6, QColor("#9063CD"))
 
+    # White rounded panel to host the logo (white bg logo needs a white bg)
+    logo_path = _resource(os.path.join("assets", "sls-logo-people.png"))
+    logo_pix = QPixmap(logo_path)
+    logo_target_h = 80
+    logo_target_w = int(logo_target_h * logo_pix.width() / max(logo_pix.height(), 1))
+    scaled_logo = logo_pix.scaled(
+        logo_target_w, logo_target_h,
+        Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
+    )
+    panel_w = scaled_logo.width() + 40
+    panel_h = scaled_logo.height() + 24
+    panel_x = (W - panel_w) // 2
+    panel_y = 22
+
+    p.setBrush(QColor("#ffffff"))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.drawRoundedRect(QRectF(panel_x, panel_y, panel_w, panel_h), 8, 8)
+    logo_x = panel_x + (panel_w - scaled_logo.width()) // 2
+    logo_y = panel_y + (panel_h - scaled_logo.height()) // 2
+    p.drawPixmap(logo_x, logo_y, scaled_logo)
+
     # App title
-    font_title = QFont("Arial", 30, QFont.Weight.Bold)
+    font_title = QFont("Arial", 28, QFont.Weight.Bold)
     p.setFont(font_title)
     p.setPen(QColor("#ffffff"))
-    p.drawText(QRect(0, 60, W, 60), Qt.AlignmentFlag.AlignHCenter, "SLS SynthPop")
+    title_y = panel_y + panel_h + 14
+    p.drawText(QRect(0, title_y, W, 50), Qt.AlignmentFlag.AlignHCenter, "LSCS SynthPop")
 
     # Subtitle
-    font_sub = QFont("Arial", 13)
+    font_sub = QFont("Arial", 12)
     p.setFont(font_sub)
     p.setPen(QColor("#c9b8f0"))
-    p.drawText(
-        QRect(0, 122, W, 30),
-        Qt.AlignmentFlag.AlignHCenter,
-        "Synthetic Data Generator",
-    )
+    sub_y = title_y + 48
+    p.drawText(QRect(0, sub_y, W, 28), Qt.AlignmentFlag.AlignHCenter, "Synthetic Data Generator")
 
     # Thin divider
+    div_y = sub_y + 36
     p.setPen(QPen(QColor("#7a55b0"), 1))
-    p.drawLine(60, 165, W - 60, 165)
+    p.drawLine(60, div_y, W - 60, div_y)
 
     # Organisation label
     font_org = QFont("Arial", 10)
     p.setFont(font_org)
     p.setPen(QColor("#a090cc"))
     p.drawText(
-        QRect(0, 175, W, 24),
+        QRect(0, div_y + 8, W, 22),
         Qt.AlignmentFlag.AlignHCenter,
-        "Scottish Longitudinal Study Development and Support Unit",
+        "Longitudinal Cohort Studies Scotland",
     )
 
     # Status message area (bottom strip)

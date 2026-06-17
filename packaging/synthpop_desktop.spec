@@ -27,6 +27,7 @@ datas = (
     + collect_data_files("scipy")
     + [(str(ROOT / "assets" / "icon.png"), "assets")]
     + [(str(ROOT / "assets" / "icon.ico"), "assets")]
+    + [(str(ROOT / "assets" / "sls-logo-people.png"), "assets")]
 )
 
 a = Analysis(
