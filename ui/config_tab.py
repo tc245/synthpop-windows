@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QThread
 
 from ui.synthesis_worker import SynthesisWorker
+from ui.widgets import CollapsibleBanner
 
 _GC_DISTRIBUTIONS = ["beta", "norm", "truncnorm", "uniform"]
 
@@ -35,8 +36,8 @@ class ConfigTab(QWidget):
         root.setContentsMargins(14, 14, 14, 14)
         root.setSpacing(8)
 
-        instructions = QLabel(
-            "<b>Step 2 — Configure and run synthesis:</b>"
+        root.addWidget(CollapsibleBanner(
+            "Step 2 — Configure and run synthesis",
             "<ol style='margin:4px 0 0 0; padding-left:20px;'>"
             "<li>Set the <b>number of output rows</b> and choose a synthesis "
             "<b>method</b> — CART works well in most cases; Gaussian Copula "
@@ -46,15 +47,8 @@ class ConfigTab(QWidget):
             "running on large datasets.</li>"
             "<li>Click <b>Generate Synthetic Data</b> to start. Progress is shown on "
             "the right — you can cancel at any time.</li>"
-            "</ol>"
-        )
-        instructions.setWordWrap(True)
-        instructions.setStyleSheet(
-            "background:#ede8f8; border:1px solid #b89ee0;"
-            " border-left:4px solid #5a3a8e;"
-            " padding:8px 12px; border-radius:4px; font-size:12px; color:#3d2570;"
-        )
-        root.addWidget(instructions)
+            "</ol>",
+        ))
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 

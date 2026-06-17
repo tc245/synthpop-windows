@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.synthesis_worker import ReportWorker
+from ui.widgets import CollapsibleBanner
 
 # Unique text marker; replaces the <img> tag in the display HTML so we can
 # locate the insertion point via QTextCursor.find() after setHtml().
@@ -49,8 +50,8 @@ class ReportTab(QWidget):
         )
         root.addWidget(notice)
 
-        instructions = QLabel(
-            "<b>Step 3 — Review and export your results:</b>"
+        root.addWidget(CollapsibleBanner(
+            "Step 3 — Review and export your results",
             "<ol style='margin:4px 0 0 0; padding-left:20px;'>"
             "<li>Check the <b>Numeric Variable Summary</b> and "
             "<b>Categorical Variable Summary</b> columns to compare "
@@ -62,15 +63,9 @@ class ReportTab(QWidget):
             "collapse or expand sections.</li>"
             "<li>Click <b>Save Synthetic CSV</b> to export the data, or "
             "<b>Save Report as HTML</b> to save the full quality report.</li>"
-            "</ol>"
-        )
-        instructions.setWordWrap(True)
-        instructions.setStyleSheet(
-            "background:#ede8f8; border:1px solid #b89ee0;"
-            " border-left:4px solid #5a3a8e;"
-            " padding:8px 12px; border-radius:4px; font-size:12px; color:#3d2570;"
-        )
-        root.addWidget(instructions)
+            "</ol>",
+            collapsed=True,
+        ))
 
         # Top bar: status badge + export buttons
         top = QHBoxLayout()
