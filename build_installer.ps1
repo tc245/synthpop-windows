@@ -73,4 +73,6 @@ if ($LASTEXITCODE -ne 0) {
 $out = Resolve-Path "dist\installer"
 Write-Host ""
 Write-Host "Done! Installer is at:" -ForegroundColor Green
-Get-ChildItem "$out\*.exe" | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor Green }
+Get-ChildItem -Path "$out" -Filter "*.exe" | ForEach-Object {
+    Write-Host ('  ' + $_.FullName) -ForegroundColor Green
+}
