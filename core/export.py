@@ -6,12 +6,27 @@ import io
 # ── PDF ───────────────────────────────────────────────────────────────────────
 
 def export_pdf(html: str, path: str) -> None:
-    """Write the report HTML to a PDF file using weasyprint."""
-    import weasyprint
+    """Write the report HTML to a PDF file using Qt's built-in PDF printer.
 
-    # weasyprint needs an explicit base_url for relative resources; none here
-    # because the heatmap is a data: URI embedded in the HTML.
-    weasyprint.HTML(string=html).write_pdf(path)
+    Uses QPrinter + QTextDocument so no native system libraries are needed
+    beyond PySide6 itself (weasyprint requires GTK/Cairo on Windows).
+    """
+    from PySide6.QtCore import QMarginsF
+    from PySide6.QtGui import QPageLayout, QPageSize, QTextDocument
+    from PySide6.QtPrintSupport import QPrinter
+
+    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+    printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+    printer.setOutputFileName(path)
+    printer.setPageLayout(QPageLayout(
+        QPageSize(QPageSize.PageSizeId.A4),
+        QPageLayout.Orientation.Portrait,
+        QMarginsF(15, 15, 15, 15),
+    ))
+
+    doc = QTextDocument()
+    doc.setHtml(html)
+    doc.print_(printer)
 
 
 # ── Excel ─────────────────────────────────────────────────────────────────────
