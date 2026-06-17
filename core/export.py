@@ -5,15 +5,18 @@ import io
 
 # ── PDF ───────────────────────────────────────────────────────────────────────
 
-def export_pdf(html: str, path: str) -> None:
-    """Write the report HTML to a PDF file using Qt's built-in PDF printer.
+def export_pdf(report: dict, path: str) -> None:
+    """Write the report to a PDF file using Qt's built-in PDF printer.
 
-    Uses QPrinter + QTextDocument so no native system libraries are needed
-    beyond PySide6 itself (weasyprint requires GTK/Cairo on Windows).
+    Renders a flat single-column HTML layout (for_pdf=True) so that
+    QTextDocument can handle it — it does not support nested tables.
     """
+    from core.report import render_report_html
     from PySide6.QtCore import QMarginsF
     from PySide6.QtGui import QPageLayout, QPageSize, QTextDocument
     from PySide6.QtPrintSupport import QPrinter
+
+    html = render_report_html(report, collapsed=set(), for_pdf=True)
 
     printer = QPrinter(QPrinter.PrinterMode.HighResolution)
     printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)

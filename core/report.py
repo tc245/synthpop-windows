@@ -203,12 +203,12 @@ def build_synth_report(orig_df, synth_df, variable_types):
     return report
 
 
-def render_report_html(report: dict, collapsed: set = None) -> str:
-    """Convert a build_synth_report() result dict to self-contained HTML for QTextBrowser.
+def render_report_html(report: dict, collapsed: set = None, for_pdf: bool = False) -> str:
+    """Convert a build_synth_report() result dict to self-contained HTML.
 
-    collapsed: set of section IDs to render collapsed. Supported IDs:
-        'num_summary', 'ks_tests', 'chi2_tests', 'cat_freq', 'corr'
-        Individual cat_freq variables: 'cat_freq::<col>'
+    collapsed: set of section IDs to render collapsed (ignored when for_pdf=True).
+    for_pdf:   produce a flat single-column layout so QTextDocument (QPrinter)
+               can render it — nested tables are not supported there.
     """
     if collapsed is None:
         collapsed = set()
@@ -358,20 +358,34 @@ def render_report_html(report: dict, collapsed: set = None) -> str:
                         )
                     right.append("</tbody></table>")
 
-    # ── Layout: two columns when both sides have content, else single column ──
-    if left and right:
+    _sec_h1 = (
+        "font-size:16px;color:#333;margin:0 0 6px 0;"
+        "border-bottom:2px solid #9063CD;padding-bottom:4px;"
+    )
+
+    # ── Layout ────────────────────────────────────────────────────────────────
+    if for_pdf:
+        # Flat single-column layout — QTextDocument doesn't support nested tables
+        if left:
+            parts.append(f"<h1 style='{_sec_h1}'>Numeric Variable Summary</h1>")
+            parts.extend(left)
+        if right:
+            parts.append(f"<h1 style='{_sec_h1}'>Categorical Variable Summary</h1>")
+            parts.extend(right)
+        if not left and not right:
+            parts.append(
+                "<p class='muted'>No numeric or categorical variables found in common "
+                "between the two datasets.</p>"
+            )
+    elif left and right:
         parts.append(
             "<table width='100%' cellspacing='0' cellpadding='0'>"
             "<tr>"
-            "<td width='50%' class='col-divider' style='padding-bottom:4px;'>"
-            "<h1 style='font-size:16px;color:#333;margin:0 0 6px 0;"
-            "border-bottom:2px solid #9063CD;padding-bottom:4px;'>"
-            "Numeric Variable Summary</h1>"
+            f"<td width='50%' class='col-divider' style='padding-bottom:4px;'>"
+            f"<h1 style='{_sec_h1}'>Numeric Variable Summary</h1>"
             "</td>"
-            "<td width='50%' class='col-right' style='padding-bottom:4px;'>"
-            "<h1 style='font-size:16px;color:#333;margin:0 0 6px 0;"
-            "border-bottom:2px solid #9063CD;padding-bottom:4px;'>"
-            "Categorical Variable Summary</h1>"
+            f"<td width='50%' class='col-right' style='padding-bottom:4px;'>"
+            f"<h1 style='{_sec_h1}'>Categorical Variable Summary</h1>"
             "</td>"
             "</tr>"
             "<tr>"

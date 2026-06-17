@@ -253,7 +253,7 @@ class ReportTab(QWidget):
                 QMessageBox.critical(self, "Save error", str(exc))
 
     def _save_pdf(self):
-        if not self._html:
+        if not self._report:
             return
         path, _ = QFileDialog.getSaveFileName(
             self, "Save Report as PDF", "synth_report.pdf", "PDF files (*.pdf)"
@@ -265,7 +265,7 @@ class ReportTab(QWidget):
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             from core.export import export_pdf
-            export_pdf(self._html, path)
+            export_pdf(self._report, path)
         except Exception as exc:
             QMessageBox.critical(self, "PDF export error", str(exc))
         finally:
