@@ -20,6 +20,7 @@ class DataTab(QWidget):
 
     data_ready = Signal(object, object)   # (df: pd.DataFrame, variable_types: dict {col: type})
     data_cleared = Signal()
+    show_help = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -179,9 +180,17 @@ class DataTab(QWidget):
         self._open_btn.setFixedHeight(38)
         self._open_btn.clicked.connect(self._open_csv)
 
+        help_btn = QPushButton("User Guide")
+        help_btn.setProperty("role", "export")
+        help_btn.setMinimumWidth(120)
+        help_btn.setFixedHeight(38)
+        help_btn.clicked.connect(self.show_help)
+
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         btn_row.addWidget(self._open_btn)
+        btn_row.addSpacing(12)
+        btn_row.addWidget(help_btn)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
@@ -191,7 +200,7 @@ class DataTab(QWidget):
             "Step 1: Load data   →   Step 2: Configure & Generate   →   Step 3: Review & Export"
         )
         steps.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        steps.setStyleSheet("color: #bbbbbb; font-size: 13px; background: transparent;")
+        steps.setStyleSheet("color: #9063CD; font-size: 13px; background: transparent;")
         layout.addWidget(steps)
 
         layout.addStretch()

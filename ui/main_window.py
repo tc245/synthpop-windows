@@ -144,6 +144,7 @@ class MainWindow(QMainWindow):
 
         self._data_tab.data_ready.connect(self._on_data_ready)
         self._data_tab.data_cleared.connect(self._on_data_cleared)
+        self._data_tab.show_help.connect(self._show_help)
         self._config_tab.synthesis_complete.connect(self._on_synthesis_complete)
 
     # ── Slots ─────────────────────────────────────────────────────────────────
