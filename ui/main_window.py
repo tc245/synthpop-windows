@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
             "<p><b>Version 1.0.0</b></p>"
             "<p>A standalone tool for generating privacy-preserving synthetic "
             "datasets from CSV files, developed for "
-            "Longitudinal Cohort Studies Scotland (LSCS).</p>"
+            "Longitudinal Studies Centre Scotland (LSCS).</p>"
             "<p>Synthesis is powered by <b>python-synthpop</b>, a Python port "
             "of the R synthpop package.</p>"
             "<p style='color:#777;'>© LSCS &nbsp;·&nbsp; "
@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         h.addWidget(subtitle)
         h.addStretch()
 
-        org = QLabel("Longitudinal Cohort Studies Scotland")
+        org = QLabel("Longitudinal Studies Centre Scotland")
         org.setStyleSheet("color: #c0a8e8; font-size: 13px; background: transparent;")
         h.addWidget(org)
 

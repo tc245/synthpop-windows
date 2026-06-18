@@ -129,7 +129,7 @@ def _make_splash_pixmap():
     p.drawText(
         QRect(0, div_y + 8, W, 22),
         Qt.AlignmentFlag.AlignHCenter,
-        "Longitudinal Cohort Studies Scotland",
+        "Longitudinal Studies Centre Scotland",
     )
 
     # Status message area (bottom strip)
